@@ -1,0 +1,23 @@
+fileFormatVersion: 2
+guid: 6070cc80e76923f49ac1a9bdf9320d15
+timeCreated: 1537020415
+licenseType: Free
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontName: W120
+  fontNames:
+  - W120
+  fallbackFontReferences: []
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  userData: 
+  assetBundleName: common.ab
+  assetBundleVariant: 

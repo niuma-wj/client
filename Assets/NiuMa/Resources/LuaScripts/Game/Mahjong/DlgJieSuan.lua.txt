@@ -1,0 +1,298 @@
+-- 描述：麻将结算界面
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.10
+
+local base = require 'BehaviourBase';
+local PlayerSettlement = require 'Game.Mahjong.PlayerSettlement';
+local mah_def = require 'Game.Mahjong.MahjongDefines';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child1 = obj.transform:Find("Frame");
+    if (child1 ~= nil) then
+        local child2 = child1:Find("TextRoomID");
+        if (child2 ~= nil) then
+            self._textRoomID = child2.gameObject;
+        end
+        child2 = child1:Find("TextDiZhu");
+        if (child2 ~= nil) then
+            self._textDiZhu = child2.gameObject;
+        end
+        child2 = child1:Find("TextTime");
+        if (child2 ~= nil) then
+            self._textTime = child2.gameObject;
+        end
+		child2 = child1:Find("TextKick");
+        if (child2 ~= nil) then
+            self._textKick = child2.gameObject;
+        end
+        self._players = {};
+        for i = 1, 4 do
+            child2 = child1:Find("Player0"..i);
+            if (child2 ~= nil) then
+                self._players[i] = PlayerSettlement.NewInstance();
+                self._players[i].gameObject = child2.gameObject;
+                self._players[i]:Awake();
+            end
+        end
+		child2 = child1:Find("BtnNextRound");
+        if (child2 ~= nil) then
+            self._btnNextRound = child2.gameObject;
+			CS.NiuMa.LuaUGUI.AddBtnClick(child2.gameObject, self.OnNextRoundClick);
+        end
+		child2 = child1:Find("BtnExitRoom");
+        if (child2 ~= nil) then
+            CS.NiuMa.LuaUGUI.AddBtnClick(child2.gameObject, self.OnExitRoomClick);
+        end
+    end
+end
+
+function _module:Start()
+    for i = 1, 4 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:Show(false);
+        end
+    end
+	self.gameObject:SetActive(false);
+end
+
+function _module:SetRoom(room)
+	self._room = room;
+    for i = 1, 4 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:SetRoom(room);
+        end
+    end
+end
+
+function _module:SetPaver(paver)
+    for i = 1, 4 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:SetPaver(paver);
+        end
+    end
+end
+
+function _module:SetMahjongSprites(obj)
+    for i = 1, 4 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:SetMahjongSprites(obj);
+        end
+    end
+end
+
+function _module:SetRoomID(id)
+    if (self._textRoomID ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textRoomID, "房号:"..tostring(id));
+    end
+end
+
+function _module:SetDiZhu(diZhu)
+    if (self._textDiZhu ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textDiZhu, "底注:"..tostring(diZhu));
+    end
+end
+
+function _module:Show(s)
+    if (self.gameObject ~= nil) then
+        self.gameObject:SetActive(s);
+    end
+end
+
+function _module:SetPlaybackTime(t)
+    if (self._textTime ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textTime, t);
+	end
+end
+
+function _module:OnSettlement(data, winGolds, names, banker, kick, playback)
+    if (data == nil) then
+        return;
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    local util = CS.NiuMa.Utility;
+    if ((not playback) and (self._textTime ~= nil)) then
+        local time = util.GetTimeMMddHHmm();
+		ui.SetText(self._textTime, time);
+	end
+    local ziMo = false;
+    local jiePao = false;
+    local fangPao = false;
+    local pingHu = false;
+    local quanQiu = false;
+    local tianHu = false;
+    local diHu = false;
+    for i = 1, 4 do
+        if (util.BitwiseAndEqual(data.huWays[i], mah_def.HuWay.DianPao)) then
+            fangPao = true;
+            break;
+        end
+    end
+    local huStyle = 0;
+    local huWay = 0;
+    local huText = "";
+    for i = 1, 4 do
+        if (self._players[i] ~= nil) then
+			self._players[i]:Show(true);
+            self._players[i]:Clear();
+			self._players[i]:SetName(names[i]);
+            ziMo = false;
+            jiePao = false;
+            huText = "";
+			huWay = data.huWays[i];
+			huStyle = data.huStyles[i];
+			print("huway"..huWay);
+			print("hustyle"..huStyle);
+            if (util.BitwiseAndEqual(huWay, mah_def.HuWay.ZiMo)) then
+                ziMo = true;
+                huText = "自摸+";
+            end
+            if (util.BitwiseAndEqual(huWay, mah_def.HuWay.DianPao)) then
+                jiePao = true;
+                huText = "接炮+";
+            end
+            if (ziMo or jiePao) then
+                pingHu = true;
+                if (util.BitwiseAndEqual(huStyle, mah_def.HuStyle.PengPengHu)) then
+                    huText = huText.."碰碰胡+";
+                elseif (util.BitwiseAndEqual(huStyle, mah_def.HuStyle.KaZhang)) then
+                    huText = huText.."平胡卡张+";
+                elseif (util.BitwiseAndEqual(huStyle, mah_def.HuStyle.BianZhang)) then
+                    huText = huText.."平胡边张+";
+                elseif (util.BitwiseAndEqual(huStyle, mah_def.HuStyle.DanDiao)) then
+                    --全求人必定是单吊
+                    if (not util.BitwiseAndEqual(huWay, mah_def.HuWay.QuanQiuRen)) then
+                        huText = huText.."平胡单吊+";
+                    else
+                        huText = huText.."平胡+";
+                    end
+                elseif (util.BitwiseAndEqual(huStyle, mah_def.HuStyle.PingHu)) then
+                    huText = huText.."平胡+";
+                else
+                    pingHu = false;
+                end
+				if (util.BitwiseAndEqual(huStyle, mah_def.HuStyle.QiXiaoDui3)) then
+                    huText = huText.."三豪华七小对+";
+				elseif (util.BitwiseAndEqual(huStyle, mah_def.HuStyle.QiXiaoDui2)) then
+                    huText = huText.."双豪华七小对+";
+				elseif (util.BitwiseAndEqual(huStyle, mah_def.HuStyle.QiXiaoDui1)) then
+                    huText = huText.."豪华七小对+";
+                elseif (util.BitwiseAndEqual(huStyle, mah_def.HuStyle.QiXiaoDui)) then
+                    huText = huText.."七小对+";
+                end
+                if (util.BitwiseAndEqual(huStyle, mah_def.HuStyle.ShiSanYao)) then
+                    huText = huText.."十三幺+";
+                end
+                if (util.BitwiseAndEqual(huStyle, mah_def.HuStyle.QingYiSe)) then
+                    huText = huText.."清一色+";
+                end
+                tianHu = util.BitwiseAndEqual(huWay, mah_def.HuWay.TianHu);
+                if (tianHu) then
+                    huText = huText.."天胡+";
+                end
+                diHu = util.BitwiseAndEqual(huWay, mah_def.HuWay.DiHu);
+                if (diHu) then
+                    huText = huText.."地胡+";
+                end
+                if (util.BitwiseAndEqual(huWay, mah_def.HuWay.MenQing) and pingHu and not tianHu and not diHu) then
+                    huText = huText.."门清+";
+                end
+                if (util.BitwiseAndEqual(huWay, mah_def.HuWay.GangShangHua1)) then
+                    huText = huText.."杠上花+";
+                elseif (util.BitwiseAndEqual(huWay, mah_def.HuWay.GangShangHua2)) then
+                    huText = huText.."杠上花x2+";
+                elseif (util.BitwiseAndEqual(huWay, mah_def.HuWay.GangShangHua3)) then
+                    huText = huText.."杠上花x3+";
+                elseif (util.BitwiseAndEqual(huWay, mah_def.HuWay.GangShangHua4)) then
+                    huText = huText.."杠上花x4+";
+                end
+                if (util.BitwiseAndEqual(huWay, mah_def.HuWay.GangShangPao1)) then
+                    huText = huText.."杠上炮+";
+                elseif (util.BitwiseAndEqual(huWay, mah_def.HuWay.GangShangPao2)) then
+                    huText = huText.."杠上炮x2+";
+                elseif (util.BitwiseAndEqual(huWay, mah_def.HuWay.GangShangPao3)) then
+                    huText = huText.."杠上炮x3+";
+                elseif (util.BitwiseAndEqual(huWay, mah_def.HuWay.GangShangPao4)) then
+                    huText = huText.."杠上炮x4+";
+                end
+                if (util.BitwiseAndEqual(huWay, mah_def.HuWay.QiangGangHu1)) then
+                    huText = huText.."抢杠胡+";
+                elseif (util.BitwiseAndEqual(huWay, mah_def.HuWay.QiangGangHu2)) then
+                    huText = huText.."抢杠胡x2+";
+                elseif (util.BitwiseAndEqual(huWay, mah_def.HuWay.QiangGangHu3)) then
+                    huText = huText.."抢杠胡x3+";
+                elseif (util.BitwiseAndEqual(huWay, mah_def.HuWay.QiangGangHu4)) then
+                    huText = huText.."抢杠胡x4+";
+                end
+                if (util.BitwiseAndEqual(huWay, mah_def.HuWay.QuanQiuRen)) then
+                    huText = huText.."全求人+";
+                end
+				if (util.BitwiseAndEqual(huWay, mah_def.HuWay.QuanQiuPao))  then
+                    huText = huText.."全求炮+";
+                end
+                if (util.BitwiseAndEqual(huWay, mah_def.HuWay.HaiDiLaoYue)) then
+                    huText = huText.."海底捞+";
+                end
+                if (util.BitwiseAndEqual(huWay, mah_def.HuWay.HaiDiPao)) then
+                    huText = huText.."海底炮+";
+                end
+                huText = string.sub(huText, 1, -2);
+				print(huText);
+                self._players[i]:SetHuText(huText);
+            end
+            if ((i - 1) == banker) then
+                self._players[i]:SetBanker(true);
+            end
+            if (ziMo) then
+                self._players[i]:SetSeal(2);
+            elseif (jiePao) then
+                self._players[i]:SetSeal(0);
+            elseif (fangPao and ((i - 1) == data.actor)) then
+                self._players[i]:SetSeal(1);
+            end
+			print("win gold:" .. winGolds[i]);
+            self._players[i]:SetScore(data.scores[i]);
+            self._players[i]:SetWinGold(winGolds[i]);
+            self._players[i]:SetTiles((i - 1), data.chapters[i], data.handTiles[i], data.huTile, ziMo or jiePao);
+        end
+    end
+    self._playback = playback;
+	if (self._textKick ~= nil) then
+		self._textKick:SetActive(kick);
+	end
+	if (self._btnNextRound ~= nil) then
+		self._btnNextRound:SetActive(not kick and not playback);
+	end
+end
+
+function _module.OnNextRoundClick()
+    local self = _module;
+	self:Show(false);
+	if (self._room ~= nil) then
+		self._room:OnNextRoundClick();
+	end
+end
+
+function _module.OnExitRoomClick()
+	--请求退出房间
+    local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    if (self._playback) then
+        --回放直接退出
+        gm:DestroyGameRoom();
+    else
+        local nm = CS.NiuMa.NetworkManager.Instance;
+        if (nm:IsConnected()) then
+	        nm:SendInnerMessage("MsgLeaveVenue");
+	        self:Show(false);
+        else
+            gm:DestroyGameRoom();
+	        gm:GetCapital();
+        end
+    end
+end
+
+return _module;

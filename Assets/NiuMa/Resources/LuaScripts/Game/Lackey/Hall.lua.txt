@@ -1,0 +1,224 @@
+-- 描述：逮狗腿大厅界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.05
+
+local base = require 'BehaviourBase';
+local com_def = require 'Common.Defines';
+local CommonUtils = require 'Common.CommonUtils';
+local LackeyAnimation = require 'Game.Lackey.LackeyAnimation';
+local DlgZhanJi = require 'Game.Lackey.DlgZhanJi';
+local DlgCreateRoom = require "Game.Lackey.DlgCreateRoom";
+local DlgJoinRoom = require 'Hall.DlgJoinRoom';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Lackey/Animate");
+    if (child ~= nil) then
+		LackeyAnimation.gameObject = child.gameObject;
+		LackeyAnimation:Awake();
+        self._lackeyAnimation = LackeyAnimation;
+    end
+	self._playerNums = {};
+	local ui = CS.NiuMa.LuaUGUI;
+	for i = 1, 4 do
+		child = obj.transform:Find("Room" .. i);
+		if (child ~= nil) then
+			ui.AddBtnAction(child.gameObject, self.OnRoomClick, i);
+			child = child:Find("TextRenShu");
+			if (child ~= nil) then
+				self._playerNums[i] = child.gameObject;
+			end
+		end
+	end
+	child = obj.transform:Find("Top/BtnBack");
+    if (child ~= nil) then
+        ui.AddBtnClick(child.gameObject, self.OnBackClick);
+    end
+    child = obj.transform:Find("BtnCreate");
+    if (child ~= nil) then
+        ui.AddBtnClick(child.gameObject, self.OnCreateClick);
+    end
+    child = obj.transform:Find("BtnJoin");
+    if (child ~= nil) then
+        ui.AddBtnClick(child.gameObject, self.OnJoinClick);
+    end
+	child = obj.transform:Find("Bottom/BtnBattle");
+    if (child ~= nil) then
+        ui.AddBtnClick(child.gameObject, self.OnZhanJiClick);
+    end
+    child = obj.transform:Find("DlgCreate");
+    if (child ~= nil) then
+		DlgCreateRoom.gameObject = child.gameObject;
+		DlgCreateRoom:Awake();
+        self._dlgCreateRoom = DlgCreateRoom;
+    end
+    child = obj.transform:Find("DlgJoin");
+    if (child ~= nil) then
+		DlgJoinRoom.gameObject = child.gameObject;
+		DlgJoinRoom:Awake();
+		DlgJoinRoom:SetEnterCallback(self.OnEnterVenue);
+        self._dlgJoinRoom = DlgJoinRoom;
+        self._dlgJoinRoom:SetGameType(com_def.GameType.Lackey);
+    end
+	child = obj.transform:Find("DlgZhanJi");
+    if (child ~= nil) then
+		DlgZhanJi.gameObject = child.gameObject;
+		DlgZhanJi:Awake();
+        self._dlgZhanJi = DlgZhanJi;
+    end
+	self._requesting = false;
+	self._districtElapsed = 0.0;
+	self._districtId = 1;
+end
+
+function _module:Start()
+	if (self._dlgCreateRoom ~= nil) then
+		self._dlgCreateRoom:SetHall(self);
+	end
+    if (self._lackeyAnimation ~= nil) then
+        self._lackeyAnimation:Start();
+    end
+	if (self._dlgZhanJi ~= nil) then
+		self._dlgZhanJi:Start();
+	end
+	self:GetDisttrictPlayerCount();
+end
+
+function _module:Update()
+	self._districtElapsed = self._districtElapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+	if (self._districtElapsed > 10.0) then
+		self._districtElapsed = 0.0;
+		if (self._requesting) then
+			return;
+		end
+		if (CommonUtils.IsStringNotEmpty(CS.NiuMa.GameManager.Instance.VenueId)) then
+			--当前已经进入房间，不需要更新区域内玩家数量
+			return;
+		end
+		self._districtId = 1;
+		self:GetDisttrictPlayerCount();
+	end
+end
+
+function _module:GetDisttrictPlayerCount()
+	local gm = CS.NiuMa.GameManager.Instance;
+	local url = "/player/game/district/player/count?districtId=" .. tostring(self._districtId);
+	gm:AuthGet(url, self.OnGetDisttrictPlayerCount);
+	self._requesting = true;
+end
+
+function _module.OnGetDisttrictPlayerCount(code, text)
+	local self = _module;
+	if (code == 200) then
+		local t = rapidjson.decode(text);
+		CS.NiuMa.LuaUGUI.SetText(self._playerNums[self._districtId], tostring(t.playerCount) .. "人");
+	end
+	if (self._districtId < 4) then
+		self._districtId = self._districtId + 1;
+		self:GetDisttrictPlayerCount();
+	else
+		self._districtId = 1;
+		self._requesting = false;
+	end
+end
+
+function _module.OnBackClick()
+	CS.NiuMa.GameManager.Instance:DestroyGameHall();
+end
+
+function _module.OnCreateClick()
+	local self = _module;
+    if (self._dlgCreateRoom ~= nil) then
+        self._dlgCreateRoom:Show(true);
+    end
+end
+
+function _module.OnJoinClick()
+	local self = _module;
+    if (self._dlgJoinRoom ~= nil) then
+        self._dlgJoinRoom:Show(true);
+    end
+end
+
+function _module.OnRoomClick(idx)
+	local self = _module;
+	local id = 0;
+	if (idx == 1) then
+		id = com_def.DistrictId.LackeyBeginner;
+	elseif (idx == 2) then
+		id = com_def.DistrictId.LackeyModerate;
+	elseif (idx == 3) then
+		id = com_def.DistrictId.LackeyAdvanced;
+	elseif (idx == 4) then
+		id = com_def.DistrictId.LackeyMaster;
+	else
+		return;
+	end
+	local url = "/player/game/enter/district?districtId=" .. tostring(id);
+	CS.NiuMa.GameManager.Instance:AuthPost(url, nil, self.OnEnterResponse);
+end
+
+function _module.OnEnterResponse(code, text)
+	local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code ~= 200) then
+		--加入失败
+		local errMsg = "";
+        if (t.msg ~= nil) then
+            errMsg = t.msg;
+        else
+            errMsg = text;
+        end
+		errMsg = "加入房间失败："..errMsg;
+        gm:ShowPromptDialog(errMsg);
+	else
+		--加入成功，直接进入
+		gm:EnterVenue(t.address, t.venueId, com_def.GameType.Lackey, self.OnEnterVenue);
+	end
+end
+
+function _module.OnZhanJiClick()
+    local self = _module;
+    if (self._dlgZhanJi ~= nil) then
+		self._dlgZhanJi:Show(true);
+		self._dlgZhanJi:OnShowDialog();
+	end
+end
+
+function _module.OnCreateResponse(code, text)
+	local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code ~= 200) then
+		--创建失败
+		local err;
+        if (t.msg ~= nil) then
+            err = t.msg;
+        else
+            err = text;
+        end
+        gm:ShowPromptDialog("创建房间失败：" .. err);
+	else
+		--创建成功，直接进入
+		gm:EnterVenue(t.address, t.venueId, com_def.GameType.Lackey, self.OnEnterVenue);
+	end
+end
+
+function _module.OnEnterVenue()
+	local gm = CS.NiuMa.GameManager.Instance;
+	local room = gm:GetGameRoom();
+	if (room ~= nil) then
+		return;
+	end
+	local prefab = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/Lackey/Room", "prefabs/lackey.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (prefab ~= nil) then
+		gm:CreateHallRoom("Lackey-Room", prefab, false);
+	end
+end
+
+return _module;

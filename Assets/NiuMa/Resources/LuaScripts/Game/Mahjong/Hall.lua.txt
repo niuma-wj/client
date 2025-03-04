@@ -1,0 +1,144 @@
+-- 描述：标准麻将大厅界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.11.18
+
+local base = require 'BehaviourBase';
+local DlgCreateRoom = require 'Game.Mahjong.DlgCreateRoom';
+local DlgJoinRoom = require 'Hall.DlgJoinRoom';
+local DlgZhanJi = require 'Game.Mahjong.DlgZhanJi';
+local DlgRule = require 'Game.Mahjong.DlgRule';
+local com_def = require 'Common.Defines';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child = obj.transform:Find("DlgCreateRoom");
+	if (child ~= nil) then
+		DlgCreateRoom.gameObject = child.gameObject;
+		DlgCreateRoom:Awake();
+		self._dlgCreateRoom = DlgCreateRoom;
+	end
+	child = obj.transform:Find("DlgJoinRoom");
+	if (child ~= nil) then
+		DlgJoinRoom.gameObject = child.gameObject;
+		DlgJoinRoom:Awake();
+		DlgJoinRoom:SetGameType(com_def.GameType.Mahjong);
+		DlgJoinRoom:SetEnterCallback(self.OnEnterVenue);
+		self._dlgJoinRoom = DlgJoinRoom;
+	end
+    child = obj.transform:Find("DlgZhanJi");
+	if (child ~= nil) then
+		DlgZhanJi.gameObject = child.gameObject;
+		DlgZhanJi:Awake();
+		self._dlgZhanJi = DlgZhanJi;
+	end
+	child = obj.transform:Find("DlgRule");
+	if (child ~= nil) then
+		DlgRule.gameObject = child.gameObject;
+		DlgRule:Awake();
+		self._dlgRule = DlgRule;
+	end
+	local ui = CS.NiuMa.LuaUGUI;
+	child = obj.transform:Find("BtnCreate");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnCreateClick);
+	end
+	child = obj.transform:Find("BtnJoin");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnJoinClick);
+	end
+	child = obj.transform:Find("BtnBack");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnBackClick);
+	end
+    child = obj.transform:Find("BtnZhanJi");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnZhanJiClick);
+	end
+	child = obj.transform:Find("BtnRule");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnRuleClick);
+	end
+end
+
+function _module:Start()
+    if (self._dlgCreateRoom ~= nil) then
+        self._dlgCreateRoom:Start();
+		self._dlgCreateRoom:SetHall(self);
+    end
+    if (self._dlgJoinRoom ~= nil) then
+        self._dlgJoinRoom:Start();
+    end
+    if (self._dlgZhanJi ~= nil) then
+        self._dlgZhanJi:Start();
+    end
+end
+
+function _module.OnCreateClick()
+	local self = _module;
+	if (self._dlgCreateRoom ~= nil) then
+		self._dlgCreateRoom:Show(true);
+	end
+end
+
+function _module.OnJoinClick()
+	local self = _module;
+	if (self._dlgJoinRoom ~= nil) then
+		self._dlgJoinRoom:Show(true);
+	end
+end
+
+function _module.OnZhanJiClick()
+	local self = _module;
+    if (self._dlgZhanJi ~= nil) then
+		self._dlgZhanJi:Show(true);
+		self._dlgZhanJi:OnShowDialog();
+	end
+end
+
+function _module.OnRuleClick()
+	local self = _module;
+	if (self._dlgRule ~= nil) then
+		self._dlgRule:Show(true);
+	end
+end
+
+function _module.OnBackClick()
+	CS.NiuMa.GameManager.Instance:DestroyGameHall();
+end
+
+function _module.OnCreateResponse(code, text)
+	local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code ~= 200) then
+		--创建失败
+		local err;
+        if (t.msg ~= nil) then
+            err = t.msg;
+        else
+            err = text;
+        end
+        gm:ShowPromptDialog("创建房间失败：" .. err);
+	else
+		--创建成功，直接进入
+		gm:EnterVenue(t.address, t.venueId, com_def.GameType.Mahjong, self.OnEnterVenue);
+	end
+end
+
+function _module.OnEnterVenue()
+	local gm = CS.NiuMa.GameManager.Instance;
+	local room = gm:GetGameRoom();
+	if (room ~= nil) then
+		return;
+	end
+	local prefab = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/Mahjong/Room", "prefabs/mahjong_main.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (prefab ~= nil) then
+		gm:CreateHallRoom("Mahjong-Room", prefab, false);
+	end
+end
+
+return _module;

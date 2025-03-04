@@ -1,0 +1,89 @@
+-- 描述：庄房界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.10.25
+
+local base = require 'BehaviourBase';
+local TableItem = require 'Hall.TableItem';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("Frame/Back/TableList");
+    local child1 = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+        ui.AddScroll2EndHandler(child.gameObject, self.OnScroll2End);
+        child1 = child:Find("Viewport/Content");
+        if (child1 ~= nil) then
+            self._itemParent = child1;
+        end
+    end
+	child = obj.transform:Find("Frame/BtnClose");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnCloseClick);
+	end
+    self._itemList = {};
+end
+
+function _module:Start()
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+	self:Show(false);
+end
+
+function _module.OnScroll2End()
+    --[[
+    local msg = bd_pb.NetMsg2Int();
+    msg.Val1 = #(self._itemList);
+    msg.Val2 = 12;
+    local pb_data = msg:SerializeToString();
+	LuaGameUtilities.SendMessage("PH_DEPOSIT_TABLE_LIST", "NetMsg2Int", pb_data);
+    --]]
+end
+
+function _module:RefreshTableList()
+    local nums = #(self._itemList);
+    for i = 1, nums do
+        GameObject.Destroy(self._itemList[i]);
+    end
+    self._itemList = {};
+    self:OnScroll2End();
+end
+
+function _module:OnDepositTableList(buf)
+    if (buf == nil) then
+		return;
+	end
+    local msg = hive_pb.NetMsgTableList();
+	msg:ParseFromString(buf);
+    local nums = #(self._itemList);
+    if (nums ~= msg.Start) then
+        return;
+    end
+    local prefab = ResourceManager.Instance:LoadResource("Prefabs/TableItem", "prefabs/hall.ab", "Assets/NiuMa/Resources/", ".prefab");
+    if (prefab == nil) then
+        return;
+    end
+    nums = #(msg.Items);
+    for i = 1, nums do
+        local item = msg.Items[i];
+		--print("item:" .. tostring(item));
+        local obj = GameObject.Instantiate(prefab, self._itemParent);
+        if (obj ~= nil) then
+            table.insert(self._itemList, obj);
+            local tr = TableItem.Awake(obj);
+            tr:SetTableItem(item);
+        end
+    end
+end
+
+return _module;

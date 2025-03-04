@@ -1,0 +1,1999 @@
+-- 描述：比鸡房间脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.27
+
+local base = require 'BehaviourBase';
+local Poker = require 'Common.Poker';
+local pok_def = require 'Common.PokerDefines';
+local GenreAnalyzer = require 'Game.BiJi.GenreAnalyzer';
+local Player = require 'Game.BiJi.Player';
+local MyCard = require 'Game.BiJi.MyCard';
+local DunCard = require 'Game.BiJi.DunCard';
+local Result = require 'Game.BiJi.Result';
+local Dialog = require 'Game.BiJi.Dialog';
+local DlgChat = require 'Game.BiJi.DlgChat';
+local DlgSettlement = require 'Game.BiJi.DlgSettlement';
+local AudioControl = require 'Game.BiJi.AudioControl';
+local Vector2 = CS.UnityEngine.Vector2;
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+_module.messages = "MsgBiJiSyncResp,MsgAddAvatar,MsgRemoveAvatar,MsgAvatarConnect,"..
+    "MsgPlayerReadyResp,MsgBiJiStartGameResp,MsgBiJiCommander,MsgBiJiGameState,MsgBiJiJoinRound,"..
+	"MsgPlayerDiamonds,MsgBiJiDealCard,MsgBiJiMakeDunResp,MsgBiJiSortDun,MsgBiJiRevocateDunResp,"..
+    "MsgBiJiResetDunResp,MsgBiJiFixDunResp,MsgBiJiDunResult,MsgBiJiAggregate,MsgBiJiSettlement,"..
+	"MsgLeaveVenueResp,MsgChatServer,MsgPlayerVoice";
+
+_module.GameState = {};
+_module.GameState.Waiting = 0;
+_module.GameState.Dealing = 1;
+_module.GameState.Combining = 2;
+_module.GameState.Comparing = 3;
+_module.GameState.Resting = 4;
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Diamond");
+    local child1 = nil;
+	if (child ~= nil) then
+		self._diamond = child.gameObject;
+		child1 = child:Find("Text");
+		if (child1 ~= nil) then
+			self._textDiamond = child1.gameObject;
+		end
+	end
+	child = obj.transform:Find("TopTip");
+    if (child ~= nil) then
+        child1 = child:Find("TextRoomID");
+        if (child1 ~= nil) then
+            self._textRoomID = child1.gameObject;
+        end
+        child1 = child:Find("TextMode");
+        if (child1 ~= nil) then
+            self._textMode = child1.gameObject;
+        end
+        child1 = child:Find("TextDiZhu");
+        if (child1 ~= nil) then
+            self._textDiZhu = child1.gameObject;
+        end
+    end
+	child = obj.transform:Find("RestTip");
+    if (child ~= nil) then
+        self._restTip = child.gameObject;
+        child1 = child:Find("Text");
+        if (child1 ~= nil) then
+            self._textRest = child1.gameObject;
+        end
+    end
+    child = obj.transform:Find("QiPaiTip");
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+        self._qiPaiTip = child.gameObject;
+        ui.AddBtnClick(child.gameObject, self.OnQiPaiBlankClick);
+    end
+    child = obj.transform:Find("Buttons");
+    if (child ~= nil) then
+		child1 = child:Find("BtnRule");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnRuleClick);
+        end
+        child1 = child:Find("BtnSetting");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnSettingClick);
+        end
+        child1 = child:Find("BtnExit");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnExitClick);
+        end
+        child1 = child:Find("BtnChat");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnChatClick);
+        end
+    end
+    child = obj.transform:Find("GameButtons");
+    if (child ~= nil) then
+		child1 = child:Find("BtnPrepare");
+        if (child1 ~= nil) then
+            self._btnPrepare = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnPrepareClick);
+        end
+        child1 = child:Find("BtnStart");
+        if (child1 ~= nil) then
+            self._btnStart = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnStartClick);
+        end
+        child1 = child:Find("BtnStart1");
+        if (child1 ~= nil) then
+            self._btnStart1 = child1.gameObject;
+        end
+        child1 = child:Find("BtnQiPai");
+        if (child1 ~= nil) then
+            self._btnQiPai = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnQiPaiClick);
+        end
+        self._btnGenres = {};
+        self._btnGenres1 = {};
+        child1 = child:Find("BtnSanTiao");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnSanTiaoClick);
+            table.insert(self._btnGenres, child1.gameObject);
+        end
+        child1 = child:Find("BtnSanTiao1");
+        if (child1 ~= nil) then
+            table.insert(self._btnGenres1, child1.gameObject);
+        end
+        child1 = child:Find("BtnTongHuaShun");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnTongHuaShunClick);
+            table.insert(self._btnGenres, child1.gameObject);
+        end
+        child1 = child:Find("BtnTongHuaShun1");
+        if (child1 ~= nil) then
+            table.insert(self._btnGenres1, child1.gameObject);
+        end
+        child1 = child:Find("BtnTongHua");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnTongHuaClick);
+            table.insert(self._btnGenres, child1.gameObject);
+        end
+        child1 = child:Find("BtnTongHua1");
+        if (child1 ~= nil) then
+            table.insert(self._btnGenres1, child1.gameObject);
+        end
+        child1 = child:Find("BtnShunZi");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnShunZiClick);
+            table.insert(self._btnGenres, child1.gameObject);
+        end
+        child1 = child:Find("BtnShunZi1");
+        if (child1 ~= nil) then
+            table.insert(self._btnGenres1, child1.gameObject);
+        end
+        child1 = child:Find("BtnDuiZi");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnDuiZiClick);
+            table.insert(self._btnGenres, child1.gameObject);
+        end
+        child1 = child:Find("BtnDuiZi1");
+        if (child1 ~= nil) then
+            table.insert(self._btnGenres1, child1.gameObject);
+        end
+		child1 = child:Find("BtnSort");
+        if (child1 ~= nil) then
+            self._btnSort = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnSortClick);
+        end
+		child1 = child:Find("BtnReset");
+        if (child1 ~= nil) then
+            self._btnReset = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnResetClick);
+        end
+        child1 = child:Find("BtnFix");
+        if (child1 ~= nil) then
+            self._btnFix = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnFixClick);
+        end
+        child1 = child:Find("Clock");
+        if (child1 ~= nil) then
+            self._clock = child1.gameObject;
+            child1 = child1:Find("Text");
+            if (child1 ~= nil) then
+                self._textCountdown = child1.gameObject;
+            end
+        end
+    end
+    child = obj.transform:Find("Duns");
+    if (child ~= nil) then
+        child1 = child:Find("BtnTouDun");
+        if (child1 ~= nil) then
+            self._btnTouDun = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnTouDunClick);
+        end
+        child1 = child:Find("BtnZhongDun");
+        if (child1 ~= nil) then
+            self._btnZhongDun = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnZhongDunClick);
+        end
+        child1 = child:Find("BtnWeiDun");
+        if (child1 ~= nil) then
+            self._btnWeiDun = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnWeiDunClick);
+        end
+        self._dunBacks = {};
+        for i = 1, 3 do
+            self._dunBacks[i] = {};
+            for j = 1, 3 do
+                child1 = child:Find("Back" .. i .. j);
+                if (child1 ~= nil) then
+                    self._dunBacks[i][j] = child1.gameObject;
+                end
+            end
+        end
+		self._dunCards = {};
+		for i = 1, 3 do
+            self._dunCards[i] = {};
+            for j = 1, 3 do
+                child1 = child:Find("Card" .. i .. j);
+                if (child1 ~= nil) then
+                    self._dunCards[i][j] = DunCard.NewInstance();
+                    self._dunCards[i][j].gameObject = child1.gameObject;
+                end
+            end
+        end
+    end
+    child = obj.transform:Find("Backs");
+    self._backs = {};
+    if (child ~= nil) then
+        for i = 1, 6 do
+            child1 = child:Find("Back0" .. i);
+            if (child1 ~= nil) then
+                self._backs[i] = child1.gameObject;
+            end
+        end
+    end
+    child = obj.transform:Find("MyCards");
+    self._myCards = {};
+    if (child ~= nil) then
+        for i = 1, 9 do
+            child1 = child:Find("Card0" .. i);
+            if (child1 ~= nil) then
+                self._myCards[i] = MyCard.NewInstance();
+                self._myCards[i].gameObject = child1.gameObject;
+            end
+        end
+    end
+    child = obj.transform:Find("Results");
+    self._results = {};
+    if (child ~= nil) then
+        for i = 1, 6 do
+            child1 = child:Find("Result0" .. i);
+            if (child1 ~= nil) then
+                self._results[i] = Result.NewInstance();
+                self._results[i].gameObject = child1.gameObject;
+                self._results[i]:Awake();
+            end
+        end
+    end
+    child = obj.transform:Find("Players");
+    self._players = {};
+    if (child ~= nil) then
+        for i = 1, 6 do
+            child1 = child:Find("Player0" .. i);
+            if (child1 ~= nil) then
+                self._players[i] = Player.NewInstance();
+                self._players[i].gameObject = child1.gameObject;
+                self._players[i]:Awake();
+            end
+        end
+    end
+    child = obj.transform:Find("CardSelector");
+    if (child ~= nil) then
+        local selector = child.gameObject:GetComponent("RectangleSelector");
+        if (selector ~= nil) then
+            selector:AddSelectedHandler(self.OnSelectChanged);
+        end
+    end
+	child = obj.transform:Find("Chat");
+	if (child ~= nil) then
+        DlgChat.gameObject = child.gameObject;
+        DlgChat:Awake();
+		self._chat = DlgChat;
+	end
+	child = obj.transform:Find("Rule");
+	if (child ~= nil) then
+        self._rule = Dialog.NewInstance();
+        self._rule.gameObject = child.gameObject;
+        self._rule:Awake();
+	end
+	child = obj.transform:Find("Setting");
+	if (child ~= nil) then
+		self._setting = Dialog.NewInstance();
+        self._setting.gameObject = child.gameObject;
+        self._setting:Awake();
+	end
+	child = obj.transform:Find("Settlement");
+	if (child ~= nil) then
+        DlgSettlement.gameObject = child.gameObject;
+        DlgSettlement:Awake();
+		self._dlgSettlement = DlgSettlement;
+	end
+	child = obj.transform:Find("Sounds");
+	if (child ~= nil) then
+        AudioControl.gameObject = child.gameObject;
+        AudioControl:Awake();
+		self._audioCtrl = AudioControl;
+	end
+	self._mode = 0;
+end
+
+function _module:Start()
+    for i = 2, 6 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:Start();
+            self._players[i]:Show(false);
+        end
+    end
+	for i = 1, 9 do
+		if (self._myCards[i] ~= nil) then
+			self._myCards[i]:Start();
+			self._myCards[i]:SetRoom(self);
+		end
+	end
+	for i = 1, 3 do
+		for j = 1, 3 do
+			if (self._dunCards[i][j] ~= nil) then
+				self._dunCards[i][j]:Start();
+				self._dunCards[i][j]:SetRoom(self);
+				self._dunCards[i][j]:SetBack(self._dunBacks[i][j]);
+			end
+		end
+	end
+	for i = 1, 6 do
+		if (self._results[i] ~= nil) then
+			self._results[i]:Start();
+			self._results[i]:SetRoom(self);
+		end
+	end
+	if (self._dlgSettlement ~= nil) then
+		self._dlgSettlement:Start();
+		self._dlgSettlement:SetRoom(self);
+	end
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:Start();
+	end
+	self:InitVoice();
+    local nm = CS.NiuMa.NetworkManager.Instance;
+	--请求同步比鸡游戏数据
+	nm:SendInnerMessage("MsgBiJiSync");
+end
+
+function _module:Update()
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:Update();
+	end
+	if (self._dlgSettlement ~= nil and self._dlgSettlement.gameObject.activeSelf) then
+		self._dlgSettlement:Update();
+	end
+	for i = 1, 6 do
+		if (self._players[i] ~= nil and self._players[i].gameObject.activeSelf) then
+			self._players[i]:Update();
+		end
+	end
+	if (not self._countdowning or self._disbanding) then
+		return;
+	end
+    local ui = CS.NiuMa.LuaUGUI;
+	self._countdown = self._countdown - CS.UnityEngine.Time.unscaledDeltaTime;
+	if (self._gameState == self.GameState.Combining) then
+		if (self._countdown > 0) then
+			local sec = math.floor(self._countdown + 0.5);
+			if (self._textCountdown ~= nil) then
+				ui.SetText(self._textCountdown, tostring(sec));
+			end
+			if (not self._fixed) then
+				if (self._alertSec ~= sec and sec < 5) then
+					self._alertSec = sec;
+					if (self._audioCtrl ~= nil) then
+						self._audioCtrl:PlayAlert();
+					end
+				end
+			end
+		else
+			self._countdowning = false;
+			if (self._clock ~= nil) then
+				self._clock:SetActive(false);
+			end
+		end
+	elseif (self._gameState == self.GameState.Resting) then
+		if (self._countdown > 0) then
+			local sec = math.floor(self._countdown + 0.5);
+			if (self._textRest ~= nil) then
+				ui.SetText(self._textRest, tostring(sec));
+			end
+		else
+			self._countdowning = false;
+			if (self._restTip ~= nil) then
+				self._restTip:SetActive(false);
+			end
+		end
+    end
+end
+
+function _module.OnRuleClick()
+    local self = _module;
+	if (self._rule ~= nil) then
+        self._rule:Show(true);
+    end
+end
+
+function _module.OnSettingClick()
+    local self = _module;
+	if (self._setting ~= nil) then
+        self._setting:Show(true);
+    end
+end
+
+function _module.OnExitClick()
+    --请求退出房间
+	local nm = CS.NiuMa.NetworkManager.Instance;
+	if (nm:IsConnected()) then
+		nm:SendInnerMessage("MsgLeaveVenue");
+    else
+        local gm = CS.NiuMa.GameManager.Instance;
+		gm:DestroyGameRoom();
+		gm:GetCapital();
+    end
+end
+
+function _module.OnChatClick()
+    local self = _module;
+	if (self._chat ~= nil) then
+		self._chat:Show(true);
+	end
+end
+
+function _module:OnMessage(msgType, json)
+    print("Process message:"..msgType);
+    if (msgType == "MsgBiJiSyncResp") then
+		self:OnSyncTable(json);
+    elseif (msgType == "MsgAddAvatar") then
+		self:OnAddAvatar(json);
+	elseif (msgType == "MsgRemoveAvatar") then
+		self:OnRemoveAvatar(json);
+    elseif (msgType == "MsgAvatarConnect") then
+        self:OnAvatarConnect(json);
+	elseif (msgType == "MsgPlayerReadyResp") then
+		self:OnPlayerReady(json);
+    elseif (msgType == "MsgBiJiStartGameResp") then
+        self:OnStartGameResp(json);
+    elseif (msgType == "MsgBiJiCommander") then
+        self:OnCommander(json);
+	elseif (msgType == "MsgBiJiGameState") then
+		self:OnGameState(json);
+	elseif (msgType == "MsgBiJiJoinRound") then
+		self:OnJoinRound(json);
+    elseif (msgType == "MsgPlayerDiamonds") then
+        self:OnPlayerDiamonds(json);
+    elseif (msgType == "MsgBiJiDealCard") then
+        self:OnDealCard(json);
+    elseif (msgType == "MsgBiJiMakeDunResp") then
+        self:OnMakeDunResp(json);
+	elseif (msgType == "MsgBiJiSortDun") then
+		self:OnSortDun(json);
+	elseif (msgType == "MsgBiJiRevocateDunResp") then
+		self:OnRevocateDunResp(json);
+	elseif (msgType == "MsgBiJiResetDunResp") then
+		self:OnResetDunResp(json);
+	elseif (msgType == "MsgBiJiFixDunResp") then
+		self:OnFixDunResp(json);
+	elseif (msgType == "MsgBiJiDunResult") then
+		self:OnDunResult(json);
+    elseif (msgType == "MsgBiJiAggregate") then
+        self:OnAggregate(json);
+	elseif (msgType == "MsgBiJiSettlement") then
+        self:OnSettlement(json);
+	elseif (msgType == "MsgLeaveVenueResp") then
+		self:OnLeaveVenueResp(json);
+	elseif (msgType == "MsgChatServer") then
+		self:OnChatServer(json);
+	elseif (msgType == "MsgPlayerVoice") then
+		self:OnPlayerVoice(json);
+    end
+end
+
+function _module:OnReconnect()
+    local nm = CS.NiuMa.NetworkManager.Instance;
+    --请求同步比鸡游戏数据
+	nm:SendInnerMessage("MsgBiJiSync");
+end
+
+-- 隐藏游戏按钮
+function _module:HideGameButtons()
+    if (self._btnStart ~= nil) then
+        self._btnStart:SetActive(false);
+    end
+    if (self._btnStart1 ~= nil) then
+        self._btnStart1:SetActive(false);
+    end
+    if (self._btnQiPai ~= nil) then
+        self._btnQiPai:SetActive(false);
+    end
+    if (self._qiPaiTip ~= nil) then
+        self._qiPaiTip:SetActive(false);
+    end
+    local nums = #(self._btnGenres);
+    for i = 1, nums do
+        if (self._btnGenres[i] ~= nil) then
+            self._btnGenres[i]:SetActive(false);
+        end
+    end
+    nums = #(self._btnGenres1);
+    for i = 1, nums do
+        if (self._btnGenres1[i] ~= nil) then
+            self._btnGenres1[i]:SetActive(false);
+        end
+    end
+    if (self._btnSort ~= nil) then
+        self._btnSort:SetActive(false);
+    end
+	if (self._btnReset ~= nil) then
+        self._btnReset:SetActive(false);
+    end
+	if (self._btnFix ~= nil) then
+        self._btnFix:SetActive(false);
+    end
+end
+
+function _module:ShowBacks(s)
+    for i = 1, 6 do
+        if (self._backs[i] ~= nil) then
+            self._backs[i]:SetActive(s);
+        end
+    end
+end
+
+function _module:ShowDuns(s)
+    if (self._btnTouDun ~= nil) then
+        self._btnTouDun:SetActive(s);
+    end
+    if (self._btnZhongDun ~= nil) then
+        self._btnZhongDun:SetActive(s);
+    end
+    if (self._btnWeiDun ~= nil) then
+        self._btnWeiDun:SetActive(s);
+    end
+end
+
+function _module:ShowMyCards(s)
+    for i = 1, 9 do
+		if (self._myCards[i] ~= nil) then
+			self._myCards[i]:Show(s);
+		end
+    end
+end
+
+function _module:ShowDunBacks(s)
+    for i = 1, 3 do
+        for j = 1, 3 do
+            if (self._dunBacks[i][j] ~= nil) then
+                self._dunBacks[i][j]:SetActive(s);
+            end
+        end
+    end
+end
+
+function _module:ResetResults(s)
+    for i = 1, 6 do
+        if (self._results[i] ~= nil) then
+			self._results[i]:ResetResult();
+            self._results[i]:Show(s);
+        end
+    end
+end
+
+-- 清理牌桌
+function _module:ClearTable()
+    self:StopDunAnimate();
+	self:ClearMyCardObjs();
+    self:HideGameButtons();
+    self:ShowDuns(false);
+    self:ShowDunBacks(false);
+    self:ShowBacks(false);
+	self:ShowMyCards(false);
+    self:ResetResults();
+    for i = 1, 6 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:Show(false);
+        end
+    end
+	self._qiPaiState = 0;
+	if (self._clock ~= nil) then
+		self._clock:SetActive(false);
+	end
+	if (self._restTip ~= nil) then
+		self._restTip:SetActive(false);
+	end
+	self._countdowning = false;
+	self._fixed = false;
+end
+
+function _module:OnSyncTable(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    self:ClearTable();
+    local msg = rapidjson.decode(json);
+    local ui = CS.NiuMa.LuaUGUI;
+    self._number = msg.number;
+    if (self._textRoomID ~= nil) then
+        ui.SetText(self._textRoomID, self._number);
+    end
+	if (self._diamond ~= nil) then
+		self._diamond:SetActive(msg.mode == 0);
+	end
+    if (self._textMode ~= nil) then
+        if (msg.Mode == 0) then
+            ui.SetText(self._textMode, "扣钻");
+        else
+            ui.SetText(self._textMode, "扣利");
+        end
+    end
+    if (self._textDiZhu ~= nil) then
+        ui.SetText(self._textDiZhu, tostring(msg.diZhu));
+    end
+	self._mode = msg.mode;
+    self._seat = msg.seat;
+    self._commander = msg.commander;
+    self._gameState = msg.gameState;
+    self._disbanding = msg.disbanding;
+end
+
+--服务器座位号(0~5)变换到客户端座位号(1~6)
+function _module:Server2ClientSeat(seat)
+    local clientSeat = 1;
+    if (seat > self._seat) then
+        clientSeat = seat + 1;
+    elseif (seat < self._seat) then
+        clientSeat = seat + 2;
+    end
+    return clientSeat;
+end
+
+function _module:OnAddAvatar(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+    --print(json);
+    local ui = CS.NiuMa.LuaUGUI;
+	local msg = rapidjson.decode(json);
+    local count = #(msg.avatars);
+    for i = 1, count do
+        local info = msg.avatars[i];
+        local text = CS.NiuMa.Utility.DecodeBase64(info.base64);
+		local extraInfo = rapidjson.decode(text);
+	    local clientSeat = self:Server2ClientSeat(info.seat);
+	    if (self._players[clientSeat] ~= nil) then
+		    self._players[clientSeat]:Show(true);
+	        self._players[clientSeat]:SetPlayerId(info.playerId);
+            self._players[clientSeat]:SetSex(info.sex);
+	        self._players[clientSeat]:SetName(info.nickname);
+	        self._players[clientSeat]:SetHeadImgUrl(info.headUrl);
+	        self._players[clientSeat]:SetGold(extraInfo.gold);
+	        self._players[clientSeat]:SetOffline(info.offline);
+	        self._players[clientSeat]:SetReady(info.ready);
+		    self._players[clientSeat]:SetJoinRound(extraInfo.joinRound);
+	        --self._players[clientSeat]:SetAddress(extraInfo.address);
+	        --self._players[clientSeat]:SetIP(extraInfo.ip);
+	        if (self._gameState ~= self.GameState.Waiting and
+                self._gameState ~= self.GameState.Resting) then
+		        self._players[clientSeat]:SetReady(false);
+	        end
+	    end
+	    if ((clientSeat == 1) and (self._mode == 0) and (self._textDiamond ~= nil)) then
+			ui.SetText(self._textDiamond, tostring(extraInfo.diamond));
+		end
+        if (self._gameState == self.GameState.Waiting or
+		    self._gameState == self.GameState.Resting) then
+		    if (clientSeat == 1 and self._btnPrepare ~= nil) then
+			    self._btnPrepare:SetActive(not info.ready);
+		    end
+	    end
+    end
+	local playerNums = self:CalcPlayerNums();
+    if (self._seat == self._commander and self._gameState == self.GameState.Waiting) then
+        if (self._btnStart ~= nil) then
+            self._btnStart:SetActive(playerNums > 1);
+        end
+        if (self._btnStart1 ~= nil) then
+            self._btnStart1:SetActive(playerNums < 2);
+        end
+    end
+end
+
+function _module:CalcPlayerNums()
+	local playerId = nil;
+	local nums = 0;
+	for i = 1, 6 do
+		if (self._players[i] ~= nil) then
+			playerId = self._players[i]:GetPlayerId();
+		else
+			playerId = nil;
+		end
+		if (playerId ~= nil) then
+			nums = nums + 1;
+		end
+	end
+	return nums;
+end
+
+function _module:OnRemoveAvatar(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:Clear();
+	end
+    local playerNums = self:CalcPlayerNums();
+    if ((self._seat == self._commander) and (self._gameState == self.GameState.Waiting)) then
+        if (self._btnStart ~= nil) then
+            self._btnStart:SetActive(playerNums > 1);
+        end
+        if (self._btnStart1 ~= nil) then
+            self._btnStart1:SetActive(playerNums < 2);
+        end
+    end
+end
+
+function _module:OnAvatarConnect(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+    if (self._seat == nil) then
+        return;
+    end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] == nil) then
+		return;
+	end
+	self._players[clientSeat]:SetOffline(msg.offline);
+end
+
+function _module:OnPlayerReady(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:SetReady(true);
+	end
+	if ((clientSeat == 1) and (self._btnPrepare ~= nil)) then
+		self._btnPrepare:SetActive(false);
+	end
+end
+
+function _module:OnStartGameResp(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    CS.NiuMa.GameManager.Instance:ShowPromptTip(msg.errMsg, 3.0);
+end
+
+function _module:OnCommander(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+    self._commander = msg.commander;
+    local clientSeat = self:Server2ClientSeat(msg.commander);
+    if (self._players[clientSeat] ~= nil) then
+        self._players[clientSeat]:SetOwner(true);
+    end
+    if ((clientSeat == 1) and (self._gameState == self.GameState.Waiting)) then
+		local playerNums = self:CalcPlayerNums();
+        if (self._btnStart ~= nil) then
+            self._btnStart:SetActive(playerNums > 1);
+        end
+        if (self._btnStart1 ~= nil) then
+            self._btnStart1:SetActive(playerNums < 2);
+        end
+    end
+end
+
+function _module.OnPrepareClick()
+	CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgPlayerReady");
+end
+
+function _module.OnStartClick()
+    CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgBiJiStartGame");
+end
+
+function _module:ClearMyCardObjs()
+	if (self._myCardObjs ~= nil) then
+        local GameObject = CS.UnityEngine.GameObject;
+		for k, v in pairs(self._myCardObjs) do
+			if (v ~= nil) then
+				GameObject.Destroy(v);
+			end
+        end
+    end
+    self._myCardObjs = {};
+end
+
+function _module:ResetMyCards()
+	local rectTrans = nil;
+    local Vector3 = CS.UnityEngine.Vector3;
+	for i = 1, 9 do
+        if (self._myCards[i] ~= nil) then
+			self._myCards[i]:SetCardObject(nil);
+            self._myCards[i]:SetDunCard(nil);
+			rectTrans = self._myCards[i]:GetTransform();
+			rectTrans.anchoredPosition = self.MyCardPositions[i];
+			rectTrans.localScale = Vector3(0.8, 0.8, 1);
+		end
+	end
+end
+
+function _module:ResetDunCards()
+	for i = 1, 3 do
+		for j = 1, 3 do
+			if (self._dunCards[i][j] ~= nil) then
+				self._dunCards[i][j]:ResetRotation();
+			end
+		end
+	end
+end
+
+-- 清除上局数据
+function _module:Clear()
+	self:ResetMyCards();
+	self:ClearMyCardObjs();
+	self:ResetResults();
+    self._myPokers = {};
+    self._occupiedIds = {};
+	self._selectedCards = {};
+    self._dunOKs = {};
+	self._orderRaw = {};
+    self._orderSuit = {};
+    self._orderRaw1 = {};
+    self._orderSuit1 = {};
+	if (self._dlgSettlement ~= nil) then
+		self._dlgSettlement:Show(false);
+	end
+end
+
+function _module:OnGameState(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+    local ui = CS.NiuMa.LuaUGUI;
+    self._gameState = msg.gameState;
+    print("GameState: " .. tostring(self._gameState));
+	if (self._gameState == self.GameState.Waiting) then
+        --能接收到等待状态，说明房间当前仅剩本玩家一人，本玩家必定为指挥官，因此不需要显示准备按钮，
+        --只需要显示开始按钮，点击开始游戏则自动就绪
+        if (self._btnPrepare ~= nil) then
+		    self._btnPrepare:SetActive(false);
+	    end
+	    if (self._restTip ~= nil) then
+		    self._restTip:SetActive(false);
+	    end
+    elseif (self._gameState == self.GameState.Combining) then
+        if (self._clock ~= nil) then
+		    self._clock:SetActive(true);
+	    end
+	    self._countdown = 30.0 - (msg.elapsed / 1000);
+	    local sec = math.floor(self._countdown + 0.5);
+	    if (self._textCountdown ~= nil) then
+            ui.SetText(self._textCountdown, tostring(sec));
+        end
+	    self._countdowning = true;
+	    local joinRound = false;
+	    if (self._players[1] ~= nil) then
+		    joinRound = self._players[1]:IsJoinRound();
+	    end
+        if (not joinRound) then
+            return;
+        end
+	    self._fixed = false;
+	    self._alertSec = 0;
+        if (self._backs[1] ~= nil) then
+            self._backs[1]:SetActive(false);
+        end
+        self:ShowDuns(true);
+	    self:ShowMyCards(true);
+        self:CheckSupportGenres();
+        if (self._btnQiPai ~= nil) then
+            self._btnQiPai:SetActive(true);
+        end
+        if (self._btnSort ~= nil) then
+            self._btnSort:SetActive(true);
+        end
+    elseif (self._gameState == self.GameState.Comparing) then
+        if (self._clock ~= nil) then
+		    self._clock:SetActive(false);
+	    end
+    elseif (self._gameState == self.GameState.Resting) then
+	    self._countdown = 10.0 - (msg.elapsed / 1000);
+	    self._countdowning = true;
+	    if (self._restTip ~= nil) then
+		    self._restTip:SetActive(true);
+	    end
+    end
+end
+
+function _module:OnJoinRound(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local nums = #(msg.seats);
+	local clientSeat = 0;
+	for i = 1, nums do
+		clientSeat = self:Server2ClientSeat(msg.seats[i]);
+		if (self._players[clientSeat] ~= nil) then
+			self._players[clientSeat]:SetJoinRound(true);
+		end
+	end
+end
+
+function _module:OnPlayerDiamonds(json)
+    if ((self._mode ~= 0) or (self._textDiamond == nil)) then
+		return;
+	end
+    if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+    local nums = #(msg.seats);
+    for i = 1, nums do
+        if (self._seat == msg.seats[i]) then
+			CS.NiuMa.LuaUGUI.SetText(self._textDiamond, tostring(msg.diamonds[i]));
+            break;
+		end
+    end
+end
+
+function _module:OnDealCard(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	self._gameState = self.GameState.Dealing;
+    if (self._seat == self._commander and self._btnStart ~= nil) then
+        self._btnStart:SetActive(false);
+    end
+    self:Clear();
+	if (self._restTip ~= nil) then
+		self._restTip:SetActive(false);
+	end
+	local joinRound = false;
+	if (self._players[1] ~= nil) then
+		joinRound = self._players[1]:IsJoinRound();
+	end
+    if (joinRound) then
+        local nums = #(msg.cards);
+        for i = 1, nums do
+            local c = msg.cards[i];
+            self._myPokers[c.id] = c;
+        end
+        self._orderRaw = msg.orderRaw;
+        self._orderSuit = msg.orderSuit;
+        nums = #(msg.orderRaw);
+        for i = 1, nums do
+            local id = msg.orderRaw[i];
+            self._orderRaw1[id] = i;
+        end
+        for i = 1, nums do
+            local id = msg.orderSuit[i];
+            self._orderSuit1[id] = i;
+        end
+        self:CreateAllMyCards();
+        if (self._analyzer == nil) then
+            self._analyzer = GenreAnalyzer.NewInstance();
+        end
+    end
+    local playerId = nil;
+    for i = 1, 6 do
+		if (self._players[i] ~= nil) then
+			playerId = self._players[i]:GetPlayerId();
+		else
+			playerId = nil;
+		end
+        if (playerId ~= nil) then
+			self._players[i]:SetReady(false);
+			joinRound = self._players[i]:IsJoinRound();
+            if (joinRound and (self._backs[i] ~= nil)) then
+                self._backs[i]:SetActive(true);
+                if (msg.elapsed == 0) then
+                    -- 做发牌动画
+                    local animator = self._backs[i]:GetComponent("Animator");
+                    if (animator ~= nil) then
+                        animator:SetTrigger("DealCard");
+                    end
+                end
+            end
+        end
+    end
+	if (joinRound and msg.elapsed == 0) then
+		if (self._audioCtrl ~= nil) then
+			self._audioCtrl:PlayDeal();
+		end
+	end
+end
+
+function _module:CheckSupportGenres()
+    local cards = {};
+    for k, v in pairs(self._myPokers) do
+        if (not self._occupiedIds[k]) then
+            local c = Poker.ToInt32(v.point, v.suit);
+            cards[k] = c;
+        end
+    end
+    self._analyzer:Analyze(cards);
+    self:SetSupportGenres();
+end
+
+function _module:CreateAllMyCards()
+    local id = 0;
+	local idx = 0;
+    local nums = #(self._orderRaw);
+    for i = 1, nums do
+        if (self._orderBySuit) then
+            id = self._orderSuit[i];
+        else
+            id = self._orderRaw[i];
+        end
+        if (not self._occupiedIds[id]) then
+			idx = self:Id2Index(id);
+			if (self._myCards[idx] ~= nil) then
+				self:CreateMyCard(id, self._myPokers[id], self._myCards[idx]);
+			end
+        end
+    end
+end
+
+function _module:GetPokerPrefab(card)
+	if (self._pokerPrefabs == nil) then
+        self._pokerPrefabs = {};
+    end
+	--local point, suit = Poker.FromInt32(card);
+    local prefabName = Poker.PokerPrefab(card.point, card.suit);
+    local prefab = self._pokerPrefabs[prefabName];
+    if (prefab == nil) then
+        prefab = CS.NiuMa.ResourceManager.Instance:LoadResource(prefabName, "prefabs/pokers.ab", "Assets/NiuMa/Resources/", ".prefab");
+        if (prefab ~= nil) then
+            self._pokerPrefabs[prefabName] = prefab;
+        end
+    end
+    return prefab;
+end
+
+function _module:CreateMyCard(id, card, myCard)
+    if (myCard == nil) then
+        return;
+    end
+	local prefab = self:GetPokerPrefab(card);
+    if (prefab == nil) then
+        return;
+    end
+	local parent = myCard:GetTransform();
+    local obj = CS.UnityEngine.GameObject.Instantiate(prefab, parent);
+    if (obj ~= nil) then
+		self._myCardObjs[id] = obj;
+        obj.transform.anchoredPosition = Vector2(0.0, 0.0);
+    end
+end
+
+function _module:TightMyCards()
+	local idx2Slot = {};
+    local slot = 1;
+	local id = 0;
+    for i = 1, 9 do
+        id = self:Index2Id(i);
+        if (not self._occupiedIds[id]) then
+            idx2Slot[i] = slot;
+            slot = slot + 1;
+        end
+    end
+	for k, v in pairs(idx2Slot) do
+        if (k ~= v) then
+            local card = self._myCards[k];
+            local trans = card:GetTransform();
+            trans.anchoredPosition = self.MyCardPositions[v];
+        end
+    end
+end
+
+-- 选中或取消选中牌(C#调用)
+function _module.OnSelectChanged(idx)
+    local self = _module;
+	local joinRound = false;
+	if (self._players[1] ~= nil) then
+		joinRound = self._players[1]:IsJoinRound();
+	end
+    if (not joinRound) then
+        return;
+    end
+    if (self._gameState ~= self.GameState.Combining or self._fixed) then
+        return;
+    end
+    if (self._makeDunAnimating or self._sortDunAnimating or self._revocateDunAnimating) then
+        -- 正在播放配墩动画，不能选中或取消选中任何牌
+        return;
+    end
+    self:SelectMyCard(idx + 1);
+end
+
+-- 选中或取消选中牌
+function _module:SelectMyCard(idx)
+	local card = self._myCards[idx];
+    if (card == nil) then
+        return;
+    end
+    if (self._selectedCards == nil) then
+        self._selectedCards = {};
+    end
+    local nums = #(self._selectedCards);
+    local selected = self:RemoveSelectedCard(idx);
+    local rectTrans = card:GetTransform();
+    local pos = rectTrans.anchoredPosition;
+    if (selected) then
+        rectTrans.anchoredPosition = Vector2(pos.x, -220);
+    else
+        rectTrans.anchoredPosition = Vector2(pos.x, -190);
+        table.insert(self._selectedCards, idx);
+        if (nums == 3) then
+            -- 选中的张数超过3，取消选中最先选中的那张牌
+            card = self._myCards[self._selectedCards[1]];
+            if (card ~= nil) then
+                rectTrans = card:GetTransform();
+                pos = rectTrans.anchoredPosition;
+                rectTrans.anchoredPosition = Vector2(pos.x, -220);
+            end
+            table.remove(self._selectedCards, 1);
+        end
+    end
+end
+
+-- 从选中列表中删除指定的牌
+function _module:RemoveSelectedCard(idx)
+    local selected = false;
+    local nums = #(self._selectedCards);
+    for i = 1, nums do
+        if (self._selectedCards[i] == idx) then
+            selected = true;
+            table.remove(self._selectedCards, i);
+            break;
+        end
+    end
+    return selected;
+end
+
+-- 取消选中所有牌
+function _module:UnselectAllMyCards()
+    if (self._selectedCards == nil) then
+        return;
+    end
+	local id = 0;
+    local idx = 0;
+    local card = nil;
+    local pos = nil;
+    local rectTrans = nil;
+    local nums = #(self._selectedCards);
+    for i = 1, nums do
+        idx = self._selectedCards[i];
+		id = self:Index2Id(idx);
+		if (not self._occupiedIds[id]) then
+			card = self._myCards[idx];
+			if (card ~= nil) then
+				rectTrans = card:GetTransform();
+				pos = rectTrans.anchoredPosition;
+				rectTrans.anchoredPosition = Vector2(pos.x, -220);
+			end
+		end
+    end
+    self._selectedCards = {};
+end
+
+-- 选中牌ID数组中的所有牌
+function _module:SelectMyCardsById(ids)
+    if (ids == nil) then
+        return;
+    end
+    self:UnselectAllMyCards();
+    local idx = 0;
+    local nums = #ids;
+    for i = 1, nums do
+        idx = self:Id2Index(ids[i]);
+        self:SelectMyCard(idx);
+    end
+end
+
+-- 选择牌型，1-三条、2-同花顺、3-同花、4-顺子、5-对子
+function _module:SelectGenre(genre)
+	if (self._fixed or self._makeDunAnimating or self._sortDunAnimating or self._revocateDunAnimating) then
+        -- 配墩动画没完成直接退出
+        return;
+    end
+    local ids = self._analyzer:GetGenreCardIds(genre);
+    self:SelectMyCardsById(ids);
+end
+
+function _module:SetSupportGenres()
+    for i = 1, 5 do
+        local test = self._analyzer:IsSupportGenre(i);
+        if (self._btnGenres[i] ~= nil) then
+            self._btnGenres[i]:SetActive(test);
+        end
+        if (self._btnGenres1[i] ~= nil) then
+            self._btnGenres1[i]:SetActive(not test);
+        end
+    end
+end
+
+function _module.OnQiPaiClick()
+    local self = _module;
+	if (self._fixed or self._makeDunAnimating or self._sortDunAnimating or self._revocateDunAnimating) then
+        -- 配墩动画没完成直接退出
+        return;
+    end
+    if (self._qiPaiState == nil) then
+        self._qiPaiState = 0;
+    end
+    if (self._qiPaiState == 0) then
+        self._qiPaiState = 1;
+        if (self._qiPaiTip ~= nil) then
+            self._qiPaiTip:SetActive(true);
+        end
+    else
+        -- 弃牌
+		self._qiPaiState = 0;
+		if (self._qiPaiTip ~= nil) then
+            self._qiPaiTip:SetActive(false);
+        end
+		CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgBiJiGiveUp");
+    end
+end
+
+function _module.OnQiPaiBlankClick()
+    local self = _module;
+    if (self._qiPaiTip ~= nil) then
+        self._qiPaiTip:SetActive(false);
+    end
+    self._qiPaiState = 0;
+end
+
+function _module.OnDuiZiClick()
+    local self = _module;
+	self:SelectGenre(5);
+end
+
+function _module.OnShunZiClick()
+    local self = _module;
+	self:SelectGenre(4);
+end
+
+function _module.OnTongHuaClick()
+    local self = _module;
+	self:SelectGenre(3);
+end
+
+function _module.OnTongHuaShunClick()
+    local self = _module;
+	self:SelectGenre(2);
+end
+
+function _module.OnSanTiaoClick()
+    local self = _module;
+	self:SelectGenre(1);
+end
+
+function _module.OnSortClick()
+    local self = _module;
+	if (self._fixed or self._makeDunAnimating or self._sortDunAnimating or self._revocateDunAnimating) then
+        -- 配墩动画没完成直接退出
+        return;
+    end
+    self:ResetMyCards();
+	self._selectedCards = {};
+	local ids = {};
+	if (self._myCardObjs ~= nil) then
+		for k, v in pairs(self._myCardObjs) do
+			if ((v ~= nil) and (not self._occupiedIds[k])) then
+				CS.UnityEngine.GameObject.Destroy(v);
+				table.insert(ids, k);
+			end
+        end
+    end
+	for i, v in ipairs(ids) do
+		self._myCardObjs[v] = nil;
+	end
+    self._orderBySuit = not self._orderBySuit;
+    self:CreateAllMyCards();
+	self:TightMyCards();
+end
+
+function _module.OnResetClick()
+    local self = _module;
+	if (self._fixed or self._makeDunAnimating or self._sortDunAnimating or self._revocateDunAnimating) then
+        -- 配墩动画没完成直接退出
+        return;
+    end
+	CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgBiJiResetDun");
+end
+
+function _module.OnFixClick()
+    local self = _module;
+	if (self._fixed or self._makeDunAnimating or self._sortDunAnimating or self._revocateDunAnimating) then
+        -- 配墩动画没完成直接退出
+        return;
+    end
+	CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgBiJiFixDun");
+end
+
+function _module.OnTouDunClick()
+    local self = _module;
+	print("OnTouDunClick");
+	if (self._dunOKs[1]) then
+		self:RevocateDun(0);
+	else
+		self:MakeDun(0);
+	end
+end
+
+function _module.OnZhongDunClick()
+    local self = _module;
+	print("OnZhongDunClick");
+    if (self._dunOKs[2]) then
+		self:RevocateDun(1);
+	else
+		self:MakeDun(1);
+	end
+end
+
+function _module.OnWeiDunClick()
+    local self = _module;
+	print("OnWeiDunClick");
+    if (self._dunOKs[3]) then
+		self:RevocateDun(2);
+	else
+		self:MakeDun(2);
+	end
+end
+
+function _module:MakeDun(dun)
+    if (self._fixed or self._makeDunAnimating or self._sortDunAnimating or self._revocateDunAnimating) then
+        -- 配墩动画没完成直接退出
+        return;
+    end
+    local nums = 0;
+    if (self._selectedCards ~= nil) then
+        nums = #(self._selectedCards);
+    end
+    if (nums ~= 3) then
+        return;
+    end
+    local gm = CS.NiuMa.GameManager.Instance;
+    local id = 0;
+    local msg = {};
+    msg.venueId = gm.VenueId;
+    msg.dun = dun;
+    msg.cardIds = {};
+    for i = 1, nums do
+        id = self._selectedCards[i];
+        if (self._orderBySuit) then
+            id = self._orderSuit[id];
+        else
+            id = self._orderRaw[id];
+        end
+        table.insert(msg.cardIds, id);
+    end
+	local json = rapidjson.encode(msg);
+	CS.NiuMa.NetworkManager.Instance:SendMessage("MsgBiJiMakeDun", json, true);
+end
+
+function _module:RevocateDun(dun)
+	if (self._fixed or self._makeDunAnimating or self._sortDunAnimating or self._revocateDunAnimating) then
+        -- 配墩动画没完成直接退出
+        return;
+    end
+    local gm = CS.NiuMa.GameManager.Instance;
+	local msg = {};
+    msg.venueId = gm.VenueId;
+	msg.dun = dun;
+	local json = rapidjson.encode(msg);
+	CS.NiuMa.NetworkManager.Instance:SendMessage("MsgBiJiRevocateDun", json, true);
+end
+
+function _module:Id2Index(id)
+    local idx = 0;
+    if (self._orderBySuit) then
+        idx = self._orderSuit1[id];
+    else
+        idx = self._orderRaw1[id];
+    end
+    return idx;
+end
+
+function _module:Index2Id(idx)
+    local id = 0;
+    if (self._orderBySuit) then
+        id = self._orderSuit[idx];
+    else
+        id = self._orderRaw[idx];
+    end
+    return id;
+end
+
+function _module:Index2Slot(idx)
+    if (idx < 2) then
+        return idx;
+    end
+    local slot = 1;
+    local id = 0;
+    for i = 1, idx - 1 do
+        id = self:Index2Id(i);
+        if (not self._occupiedIds[id]) then
+            slot = slot + 1;
+        end
+    end
+    return slot;
+end
+
+function _module:Id2Slot(id)
+    local idx = self:Id2Index(id);
+    local slot = self:Index2Slot(idx);
+    return slot;
+end
+
+_module.DunCardPositions = {};
+_module.DunCardPositions[1] = Vector2(-210.0, 18.0);
+_module.DunCardPositions[2] = Vector2(-180.0, 18.0);
+_module.DunCardPositions[3] = Vector2(-150.0, 18.0);
+_module.DunCardPositions[4] = Vector2(-30.0, 18.0);
+_module.DunCardPositions[5] = Vector2(0.0, 18.0);
+_module.DunCardPositions[6] = Vector2(30.0, 18.0);
+_module.DunCardPositions[7] = Vector2(150.0, 18.0);
+_module.DunCardPositions[8] = Vector2(180.0, 18.0);
+_module.DunCardPositions[9] = Vector2(210.0, 18.0);
+
+_module.MyCardPositions = {};
+_module.MyCardPositions[1] = Vector2(-320.0, -220.0);
+_module.MyCardPositions[2] = Vector2(-240.0, -220.0);
+_module.MyCardPositions[3] = Vector2(-160.0, -220.0);
+_module.MyCardPositions[4] = Vector2(-80.0, -220.0);
+_module.MyCardPositions[5] = Vector2(0.0, -220.0);
+_module.MyCardPositions[6] = Vector2(80.0, -220.0);
+_module.MyCardPositions[7] = Vector2(160.0, -220.0);
+_module.MyCardPositions[8] = Vector2(240.0, -220.0);
+_module.MyCardPositions[9] = Vector2(320.0, -220.0);
+
+function _module:OnMakeDunResp(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+    local ids = {};
+    if (msg.duns[1]) then
+        for i = 1, 3 do
+            table.insert(ids, msg.dunIds1[i]);
+        end
+        self._dunOKs[1] = true;
+    end
+    if (msg.duns[2]) then
+        for i = 1, 3 do
+            table.insert(ids, msg.dunIds2[i]);
+        end
+        self._dunOKs[2] = true;
+    end
+    if (msg.duns[3]) then
+        for i = 1, 3 do
+            table.insert(ids, msg.dunIds3[i]);
+        end
+        self._dunOKs[3] = true;
+    end
+    local oldIdx2Slot = {};
+    local slot = 1;
+    local id = 0;
+    for i = 1, 9 do
+        id = self:Index2Id(i);
+        if (not self._occupiedIds[id]) then
+            oldIdx2Slot[i] = slot;
+            slot = slot + 1;
+        end
+    end
+    local nums = #(ids);
+    for i = 1, nums do
+        self._occupiedIds[ids[i]] = true;
+    end
+    local newIdx2Slot = {};
+    slot = 1;
+    nums = 1;
+    for i = 1, 9 do
+        id = self:Index2Id(i);
+        if (not self._occupiedIds[id]) then
+            newIdx2Slot[i] = slot;
+            slot = slot + 1;
+        end
+    end
+    local idx1 = 0;
+    local idx2 = 0;
+    local obj = nil;
+    local card = nil;
+    local rectTrans = nil;
+    local tweener = nil;
+	local first = true;
+    local Vector3 = CS.UnityEngine.Vector3;
+    if (msg.animate) then
+        -- 播放配墩动画
+        for d = 1, 3 do
+            if (msg.duns[d]) then
+                for i = 1, 3 do
+                    idx1 = (d - 1) * 3 + i;
+                    idx2 = self:Id2Index(ids[nums]);
+                    self:RemoveSelectedCard(idx2);
+                    obj = self._myCardObjs[ids[nums]];
+                    card = self._myCards[idx2];
+                    nums = nums + 1;
+					if (card ~= nil and obj ~= nil) then
+                        card:SetCardObject(obj);
+						card:SetDunCard(self._dunCards[d][i]);
+						card:SetFinalCard(first);
+						if (first) then
+							first = false;
+						end
+                        card:ShipCard(self.DunCardPositions[idx1], Vector3(0.5, 0.5, 1.0));
+					end
+                end
+            end
+        end
+		self._makeDunAnimating = not first;
+        for k, v in pairs(newIdx2Slot) do
+            if (v ~= oldIdx2Slot[k]) then
+                card = self._myCards[k];
+                card:SetCardObject(nil);
+				card:SetDunCard(nil);
+                card:ShipCard(self.MyCardPositions[v], nil);
+            end
+        end
+    else
+        -- 不播放配墩动画
+		local obj = nil;
+        for d = 1, 3 do
+            if (msg.duns[d]) then
+                for i = 1, 3 do
+                    idx1 = (d - 1) * 3 + i;
+                    idx2 = self:Id2Index(ids[nums]);
+                    self:RemoveSelectedCard(idx2);
+					obj = self._myCardObjs[ids[nums]];
+                    card = self._myCards[idx2];
+					if (card ~= nil and obj ~= nil) then
+						rectTrans = card:GetTransform();
+						rectTrans.anchoredPosition = self.DunCardPositions[idx1];
+						rectTrans.localScale = Vector3(0.5, 0.5, 1.0);
+						obj.transform:SetParent(self._dunCards[d][i]:GetTransform());
+					end
+					nums = nums + 1;
+                end
+            end
+        end
+        for k, v in pairs(newIdx2Slot) do
+            if (v ~= oldIdx2Slot[k]) then
+                card = self._myCards[k];
+                rectTrans = card:GetTransform();
+                rectTrans.anchoredPosition = self.MyCardPositions[v];
+            end
+        end
+		self:ShowResetFix();
+    end
+    self:CheckSupportGenres();
+end
+
+function _module:OnShipCardComplete()
+    if (self._makeDunAnimating) then
+	    print("OnMakeDunComplete");
+        self._makeDunAnimating = false;
+	    if (self._sortDunAnimating) then
+		    self:DoSortDun();
+	    else
+		    self:ShowResetFix();
+	    end
+    elseif (self._revocateDunAnimating) then
+        print("OnRevocateDunComplete");
+        self._revocateDunAnimating = false;
+    end
+end
+
+function _module:OnSortDun(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+    self._sortDunData = msg;
+	self._sortDunAnimating = true;
+	if (not self._makeDunAnimating) then
+		self:DoSortDun();
+	end
+end
+
+function _module:DoSortDun()
+	if (self._sortDunData == nil) then
+		self:OnSortDunComplete();
+		return;
+	end
+	local id = 0;
+	local dunIds = {};
+	dunIds[1] = self._sortDunData.dunIds1;
+	dunIds[2] = self._sortDunData.dunIds2;
+	dunIds[3] = self._sortDunData.dunIds3;
+	local first = true;
+	for i = 1, 3 do
+		if (self._sortDunData.duns[i]) then
+			for j = 1, 3 do
+				id = dunIds[i][j];
+				self._dunCards[i][j]:SetCardObject(self._myCardObjs[id]);
+				self._dunCards[i][j]:SetFinalCard(first);
+				self._dunCards[i][j]:FlipCard();
+				if (first) then
+					first = false;
+				end
+			end
+		end
+	end
+	if (first) then
+		self:OnSortDunComplete();
+	end
+    self._sortDunData = nil;
+end
+
+function _module:OnSortDunComplete()
+    print("OnSortDunComplete");
+	self._sortDunAnimating = false;
+	self:ShowResetFix();
+end
+
+function _module:OnRevocateDunResp(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local dun = msg.dun;
+    local ids = {};
+	for i = 1, 3 do
+		ids[i] = msg.cardIds[i];
+	end
+	local oldIdx2Slot = {};
+    local slot = 1;
+    local id = 0;
+    for i = 1, 9 do
+        id = self:Index2Id(i);
+        if (not self._occupiedIds[id]) then
+            oldIdx2Slot[i] = slot;
+            slot = slot + 1;
+        end
+    end
+    for i = 1, 3 do
+        self._occupiedIds[ids[i]] = false;
+    end
+    local newIdx2Slot = {};
+    slot = 1;
+    for i = 1, 9 do
+        id = self:Index2Id(i);
+        if (not self._occupiedIds[id]) then
+            newIdx2Slot[i] = slot;
+            slot = slot + 1;
+        end
+    end
+	self._dunOKs[dun + 1] = false;
+	self._revocateDunAnimating = true;
+    local idx1 = 0;
+    local idx2 = 0;
+	local obj = nil;
+	local card = nil;
+	local trans = nil;
+	local tweener = nil;
+    local Vector3 = CS.UnityEngine.Vector3;
+	for i = 1, 3 do
+        idx1 = dun * 3 + i;
+        idx2 = self:Id2Index(ids[i]);
+		slot = newIdx2Slot[idx2];
+		card = self._myCards[idx2];
+		obj = self._myCardObjs[ids[i]];
+		if (card ~= nil and obj ~= nil) then
+			trans = card:GetTransform();
+			trans.anchoredPosition = self.DunCardPositions[idx1];
+			trans.localScale = Vector3(0.5, 0.5, 1.0);
+			obj.transform:SetParent(trans);
+            card:ShipCard(self.MyCardPositions[slot], Vector3(0.8, 0.8, 1.0));
+			if (i == 3) then
+                card:SetFinalCard(true);
+			end
+		end
+	end
+	for k, v in pairs(oldIdx2Slot) do
+		slot = newIdx2Slot[k];
+        if (v ~= slot) then
+            card = self._myCards[k];
+            trans = card:GetTransform();
+			local pos = trans.anchoredPosition;
+            pos = Vector2(self.MyCardPositions[slot].x, pos.y);
+            card:SetCardObject(nil);
+            card:SetDunCard(nil);
+            card:ShipCard(pos);
+        end
+    end
+	self:ShowResetFix();
+	self:CheckSupportGenres();
+end
+
+function _module:OnResetDunResp(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local dunIds = {};
+	dunIds[1] = {};
+	dunIds[2] = {};
+	dunIds[3] = {};
+	local nums = 1;
+	for i = 1, 3 do
+		for j = 1, 3 do
+			dunIds[i][j] = msg.cardIds[nums];
+			nums = nums + 1;
+		end
+		self._dunOKs[i] = false;
+	end
+	self._occupiedIds = {};
+	self._revocateDunAnimating = true;
+	local id = 0;
+	local idx1 = 0;
+	local idx2 = 0;
+	local obj = nil;
+	local card = nil;
+	local trans = nil;
+    local Vector3 = CS.UnityEngine.Vector3;
+	for i = 1, 3 do
+		for j = 1, 3 do
+			idx1 = (i - 1) * 3 + j;
+			id = dunIds[i][j];
+			idx2 = self:Id2Index(id);
+			obj = self._myCardObjs[id];
+			card = self._myCards[idx2];
+			if (card ~= nil and obj ~= nil) then
+				trans = card:GetTransform();
+				trans.anchoredPosition = self.DunCardPositions[idx1];
+				trans.localScale = Vector3(0.5, 0.5, 1.0);
+				obj.transform:SetParent(trans);
+                card:ShipCard(self.MyCardPositions[idx2], Vector3(0.8, 0.8, 1.0));
+				if (i == 3 and j == 3) then
+					card:SetFinalCard(true);
+				end
+			end
+		end
+	end
+	self:ShowResetFix();
+	self:CheckSupportGenres();
+end
+
+function _module:ShowResetFix()
+	local show = false;
+	if (self._gameState == self.GameState.Combining and not self._fixed and
+		self._dunOKs[1] and self._dunOKs[2] and self._dunOKs[3]) then
+		show = true;
+	end
+	if (self._btnReset ~= nil) then
+        self._btnReset:SetActive(show);
+    end
+	if (self._btnFix ~= nil) then
+        self._btnFix:SetActive(show);
+    end
+end
+
+-- 停止所有牌墩动画
+function _module:StopDunAnimate()
+    for i = 1, 9 do
+        if (self._myCards[i] ~= nil) then
+            self._myCards[i]:StopShipCard();
+        end
+    end
+    for i = 1, 3 do
+	    for j = 1, 3 do
+            if (self._dunCards[i][j] ~= nil) then
+                self._dunCards[i][j]:StopFlipCard();
+            end
+        end
+    end
+    self._sortDunAnimating = false;
+    self._makeDunAnimating = false;
+    self._revocateDunAnimating = false;
+end
+
+function _module:OnFixDunResp(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._results[clientSeat] == nil) then
+		return;
+	end
+	local qiPai = msg.qiPai;
+	self._results[clientSeat]:ResetResult();
+	self._results[clientSeat]:Show(true);
+	self._results[clientSeat]:SetQiPai(qiPai);
+	if (clientSeat == 1) then
+        -- 先停止牌墩动画
+        self:StopDunAnimate();
+		if (qiPai) then
+			self._results[1]:ShowBacks(true);
+			self:ClearMyCardObjs();
+		else
+			self._results[1]:ShowBacks(false);
+			local id = 0;
+			local nums = 1;
+			local obj = nil;
+			for i = 1, 3 do
+				for j = 1, 3 do
+					id = msg.cardIds[nums];
+					nums = nums + 1;
+					obj = self._myCardObjs[id];
+					self._results[1]:SetCardObject(i, j, obj);
+				end
+			end
+			self._myCardObjs = {};
+		end
+		self._fixed = true;
+		self:HideGameButtons();
+		self:ShowDuns(false);
+		self:ShowResetFix();
+	else
+		if (self._backs[clientSeat] ~= nil) then
+			self._backs[clientSeat]:SetActive(false);
+		end
+		self._results[clientSeat]:ShowBacks(true);
+	end
+end
+
+function _module:OnDunResult(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local dun = msg.dun + 1;
+	local animate = msg.animate;
+	local nums = #(msg.results);
+	local clientSeat = 0;
+	for i = 1, nums do
+		local result = msg.results[i];
+		clientSeat = self:Server2ClientSeat(result.seat);
+		if (self._results[clientSeat] ~= nil) then
+			self._results[clientSeat]:SetResult(dun, result, animate, clientSeat == 1);
+		end
+		if (clientSeat == 1) then
+			if (self._audioCtrl ~= nil) then
+				local male = self._players[1]:GetSex();
+				self._audioCtrl:PlayGenre(result.genre, (male == 1));
+			end
+		end
+	end
+end
+
+function _module:OnAggregate(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+    --print(json);
+	local msg = rapidjson.decode(json);
+    local animate = msg.animate;
+	local nums = #(msg.scores);
+	local clientSeat = 0;
+    local util = CS.NiuMa.Utility;
+	for i = 1, nums do
+		local score = msg.scores[i];
+		clientSeat = self:Server2ClientSeat(score.seat);
+		if (self._results[clientSeat] ~= nil) then
+			self._results[clientSeat]:SetScore(score, animate);
+		end
+		if (clientSeat == 1) then
+			if (self._audioCtrl ~= nil and
+				util.BitwiseAndEqual(score.rewardType, pok_def.BiJiRewardType.TongGuan)) then
+				self._audioCtrl:PlayTongGuan();
+			end
+		end
+	end
+end
+
+function _module:OnSettlement(json)
+	if (json == nil or #json == 0 or self._dlgSettlement == nil) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local names = {};
+	local textures = {};
+	local clientSeat = 0;
+	local nums = #(msg.settlements);
+	local commander = 0;
+	for i = 1, nums do
+		clientSeat = self:Server2ClientSeat(msg.settlements[i].seat);
+		if (self._players[clientSeat] ~= nil) then
+			table.insert(names, self._players[clientSeat]:GetName());
+			table.insert(textures, self._players[clientSeat]:GetHeadTexture());
+			self._players[clientSeat]:SetGold(msg.settlements[i].gold);
+		end
+		if (self._commander == msg.settlements[i].seat) then
+			commander = i;
+		end
+	end
+	self._dlgSettlement:Show(true);
+	self._dlgSettlement:OnSettlement(msg, names, textures, commander);
+end
+
+function _module:OnLeaveVenueResp(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+    local gm = CS.NiuMa.GameManager.Instance;
+	if (msg.result == 0) then
+		--离开成功，直接退出
+		gm:DestroyGameRoom();
+	    gm:GetCapital();
+	else
+		--离开失败
+		gm:ShowPromptTip(msg.errMsg, 3.0);
+	end
+end
+
+function _module:OnChatServer(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+		if (msg.type == 1) then
+			self._players[clientSeat]:SetChatEmoji(msg.index);
+		elseif (msg.type == 2) then
+			self._players[clientSeat]:SetChatPhrase(msg.index);
+            if (self._audioCtrl ~= nil) then
+                local sex = self._players[clientSeat]:GetSex();
+                self._audioCtrl:PlayPhrase(clientSeat, msg.index, (sex == 1));
+            end
+		elseif (msg.type == 3) then
+			self._players[clientSeat]:SetChatText(msg.text);
+		end
+	end
+end
+
+function _module:InitVoice()
+	local listener = self.gameObject:GetComponent("VoiceListener");
+	if (listener == nil) then
+		return;
+	end
+	listener:AddRecordCompletedHandler(self.OnRecordCompleted);
+	listener:AddPlayStartHandler(self.OnPlayStart);
+	listener:AddPlayStopHandler(self.OnPlayEnd);
+end
+
+function _module.OnRecordCompleted(fileName)
+	--语音录制完成
+	local nm = CS.NiuMa.NetworkManager.Instance;
+	local vm = CS.NiuMa.VoiceManager.Instance;
+	--发送语音消息
+	nm:SendVoiceMessage(fileName);
+	--将录制的mp3文件压入播放队列
+	vm:PushVoice(fileName, 1);
+end
+
+function _module.OnPlayStart(clientSeat)
+	local self = _module;
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:ShowChatTalk(true);
+	end
+end
+
+function _module.OnPlayEnd(clientSeat)
+	local self = _module;
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:ShowChatTalk(false);
+	end
+end
+
+function _module:OnPlayerVoice(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	CS.NiuMa.VoiceManager.Instance:PushVoice(msg.fileName, clientSeat);
+end
+
+return _module;

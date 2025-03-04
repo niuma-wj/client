@@ -1,0 +1,69 @@
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    self._Objects = {};
+    self._tilePrefab = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/Mahjong/Tiles/DownSouth", "prefabs/mahjong_tiles.ab", "Assets/NiuMa/Resources/", ".prefab");
+end
+
+function _module:Start()
+end
+
+function _module:Show(show)
+    if (self.gameObject ~= nil) then
+        self.gameObject:SetActive(show);
+    end
+end
+
+function _module:SetMahjongSprites(obj)
+    self._mahjongSprites = obj;
+end
+
+function _module:SetTingTiles(tiles)
+    if (tiles == nil) then
+        return ;
+    end
+    for i, v in ipairs(self._Objects) do
+        CS.UnityEngine.GameObject.Destroy(v);
+    end
+    self._Objects = {};
+    if (self._mahjongSprites == nil) then
+        return;
+    end
+    local nums = #tiles;
+    if (nums < 1) then
+        return;
+    end
+    local trans = self.gameObject.transform;
+    if (trans ~= nil) then
+        local width = 116 + 56 * (nums - 1);
+        local height = trans.sizeDelta.y;
+        trans.sizeDelta = CS.UnityEngine.Vector2(width, height);
+    end
+    local x = 80.0;
+    local locScale = CS.UnityEngine.Vector3(0.6, 0.6, 1.0);
+    for i, v in ipairs(tiles) do
+        inst = CS.UnityEngine.GameObject.Instantiate(self._tilePrefab, self.gameObject.transform);
+        if (inst ~= nil) then
+            inst.name = "Ting"..i;
+            trans = inst.transform;
+            if (trans ~= nil) then
+                trans.localScale = locScale;
+                trans.anchorMin = CS.UnityEngine.Vector2(0.0, 0.5);
+                trans.anchorMax = CS.UnityEngine.Vector2(0.0, 0.5);
+                trans.anchoredPosition = CS.UnityEngine.Vector2(x, 0.0);
+            end
+            local mb = inst:GetComponent("MahjongBrick");
+		    if (mb ~= nil) then
+			    mb:SetMahjongSprites(self._mahjongSprites);
+			    mb:SetMahjongTile(v.pattern, v.number, 0);
+		    end
+            self._Objects[i] = inst;
+        end
+        x = x + 56.0;
+    end
+end
+
+return _module;

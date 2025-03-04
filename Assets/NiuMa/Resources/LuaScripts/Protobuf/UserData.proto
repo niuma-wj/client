@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+message UserData
+{
+	required sint32 Sex = 1;
+	required string Name = 2;
+	required string HeadImgUrl = 3;
+	optional string County = 4 [default = ""];
+	optional string Province = 5 [default = ""];
+	optional string City = 6 [default = ""];
+	optional string Birthday = 7 [default = ""];
+	optional string Address = 8 [default = ""];
+	optional string IP = 9 [default = ""];
+}

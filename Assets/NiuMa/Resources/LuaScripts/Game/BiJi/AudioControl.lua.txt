@@ -1,0 +1,178 @@
+-- 描述：比鸡音频控制逻辑脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.28
+
+local base = require 'BehaviourBase';
+local pok_def = require 'Common.PokerDefines';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	self._players = {};
+    local child = nil;
+	for i = 1, 6 do
+		child = obj.transform:Find("Player" .. i);
+		if (child ~= nil) then
+			table.insert(self._players, child.gameObject:GetComponent("AudioSource"));
+		end
+	end
+	child = obj.transform:Find("Game");
+	if (child ~= nil) then
+		self._gameSound = child.gameObject:GetComponent("AudioSource");
+	end
+end
+
+function _module:Start()
+    local bgMusic = CS.NiuMa.AudioManager.Instance.BackgroundMusic;
+    if (bgMusic == nil) then
+        return ;
+    end
+    local resName = "Sounds/Game/BiJi/bg";
+    local audioClip = CS.NiuMa.ResourceManager.Instance:LoadResource(resName, "sounds/biji.ab", "Assets/NiuMa/Resources/", ".ogg");
+    if (audioClip ~= nil) then
+        bgMusic.clip = audioClip;
+        bgMusic:Play();
+    end
+end
+
+_module.DealPoints = { 0.01, 0.11, 0.21, 0.31, 0.41, 0.51, 0.61, 0.71 };
+
+function _module:Update()
+	if (not self._dealing) then
+		return;
+	end
+	local oldElapsed = self._dealElapsed;
+	self._dealElapsed = self._dealElapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+	local pos = 0;
+	for i = 1, 8 do
+		if (oldElapsed < self.DealPoints[i] and
+			self._dealElapsed >= self.DealPoints[i]) then
+			pos = i;
+			break;
+		end
+	end
+	if (self._dealElapsed >= self.DealPoints[8]) then
+		self._dealing = false;
+	end
+	if (pos ~= 0 and self._gameSound ~= nil) then
+		local clip = self:GetAudioClip("Sounds/Game/BiJi/BiJi/card");
+		if (clip ~= nil) then
+			self._gameSound.clip = clip;
+			self._gameSound:Play();
+		end
+	end
+end
+
+function _module:GetAudioClip(resName, ext)
+	if (self._audioClips == nil) then
+		self._audioClips = {};
+	end
+	local clip = self._audioClips[resName];
+	local tmp = ext;
+	if (tmp == nil) then
+		tmp = ".ogg";
+	end
+	if (clip == nil) then
+		clip = CS.NiuMa.ResourceManager.Instance:LoadResource(resName, "sounds/biji.ab", "Assets/NiuMa/Resources/", tmp);
+		if (clip ~= nil) then
+			self._audioClips[resName] = clip;
+		end
+	end
+	return clip;
+end
+
+function _module:PlayDeal()
+	if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+		return;
+	end
+	self._dealing = true;
+	self._dealElapsed = 0.0;
+end
+
+function _module:PlayGenre(genre, male)
+	if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+	if (self._gameSound == nil) then
+		return;
+	end
+	local clipName = "";
+	if (pok_def.BiJiGenre.Triple == genre) then
+		clipName = "santiao";
+	elseif (pok_def.BiJiGenre.FlushStraight == genre) then
+		clipName = "tonghuashun";
+	elseif (pok_def.BiJiGenre.Flush == genre) then
+		clipName = "tonghua";
+	elseif (pok_def.BiJiGenre.Straight == genre) then
+		clipName = "shunzi";
+	elseif (pok_def.BiJiGenre.Pair == genre) then
+		clipName = "duizi";
+	elseif (pok_def.BiJiGenre.Single == genre) then
+		clipName = "wulong";
+	end
+	if (#clipName == 0) then
+		return;
+	end
+	if (male) then
+		clipName = "Sounds/Game/BiJi/BiJi/Male/" .. clipName;
+	else
+		clipName = "Sounds/Game/BiJi/BiJi/Female/" .. clipName;
+	end
+	local clip = self:GetAudioClip(clipName);
+	if (clip ~= nil) then
+		self._gameSound.clip = clip;
+		self._gameSound:Play();
+	end
+end
+
+function _module:PlayTongGuan()
+	if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+	if (self._gameSound == nil) then
+		return;
+	end
+	local clip = self:GetAudioClip("Sounds/Game/BiJi/BiJi/allpass");
+	if (clip ~= nil) then
+		self._gameSound.clip = clip;
+		self._gameSound:Play();
+	end
+end
+
+function _module:PlayAlert()
+	if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+	if (self._gameSound == nil) then
+		return;
+	end
+	local clip = self:GetAudioClip("Sounds/Game/BiJi/alert", ".mp3");
+	if (clip ~= nil) then
+		self._gameSound.clip = clip;
+		self._gameSound:Play();
+	end
+end
+
+function _module:PlayPhrase(clientSeat, phrase, male)
+    if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+    if (self._players == nil or self._players[clientSeat] == nil) then
+        return;
+    end
+    local clipName = "";
+    if (male) then
+        clipName = string.format("Sounds/Game/BiJi/Phrase/Male/phrase%02d", phrase);
+    else
+        clipName = string.format("Sounds/Game/BiJi/Phrase/Female/phrase%02d", phrase);
+    end
+    local clip = self:GetAudioClip(clipName);
+    if (clip ~= nil) then
+        self._players[clientSeat].clip = clip;
+        self._players[clientSeat]:Play();
+    end
+end
+
+return _module;

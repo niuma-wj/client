@@ -1,0 +1,148 @@
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("Gold2/Text");
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+        self._textGold = child.gameObject;
+    end
+    child = obj.transform:Find("Deposit2/Text");
+    if (child ~= nil) then
+        self._textDeposit = child.gameObject;
+    end
+    child = obj.transform:Find("Amount2");
+    if (child ~= nil) then
+        self._inputAmount = child.gameObject;
+        ui.SetInputChangeHandler(child.gameObject, self.OnInputChanged);
+    end
+    child = obj.transform:Find("Slider");
+    if (child ~= nil) then
+        self._slider = child.gameObject;
+        ui.SetSliderChangeHandler(child.gameObject, self.OnSliderChanged);
+    end
+    child = obj.transform:Find("BtnDeposit");
+    if (child ~= nil) then
+        ui.AddBtnClick(child.gameObject, self.OnDepositClick);
+    end
+    self._amount = 0;
+end
+
+function _module:SetHall(h)
+    self._hall = h;
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+function _module:Refresh()
+    local ui = CS.NiuMa.LuaUGUI;
+    local gm = CS.NiuMa.GameManager.Instance;
+    if (self._textGold ~= nil) then
+        ui.SetText(self._textGold, tostring(gm.Gold));
+    end
+    if (self._textDeposit ~= nil) then
+        ui.SetText(self._textDeposit, tostring(gm.Deposit));
+    end
+    self:UpdateSliderValue();
+end
+
+function _module.OnInputChanged(text)
+    local self = _module;
+    if (self._ignoreInputEvent) then
+        self._ignoreInputEvent = false;
+        return;
+    end
+	local num = math.floor(tonumber(text));
+	if (num == nil) then
+		return;
+	end
+    self._amount = num;
+    self:UpdateSliderValue();
+end
+
+function _module:UpdateSliderValue()
+    if (self._slider == nil) then
+        return;
+    end
+    local max = CS.NiuMa.GameManager.Instance.Gold;
+    local val = self._amount;
+    if (val < 0) then
+        val = 0;
+    elseif (val > max) then
+        val = max;
+    end
+    if (max > 0) then
+        val = val / max;
+    else
+        val = 0;
+    end
+    self._ignoreSliderEvent = true;
+    CS.NiuMa.LuaUGUI.SetSliderValue(self._slider, val);
+end
+
+function _module.OnSliderChanged(val)
+    local self = _module;
+    if (self._ignoreSliderEvent) then
+        self._ignoreSliderEvent = false;
+        return;
+    end
+    local max = CS.NiuMa.GameManager.Instance.Gold;
+    self._amount = math.floor(max * val + 0.5);
+    if (self._inputAmount ~= nil) then
+        self._ignoreInputEvent = true;
+        CS.NiuMa.LuaUGUI.SetInputText(self._inputAmount, tostring(self._amount));
+    end
+end
+
+function _module.OnDepositClick()
+    local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    if (self._amount <= 0) then
+        gm:ShowPromptTip("存入数量必须大于0", 2.0);
+        return;
+    end
+    if (self._amount > gm.Gold) then
+        gm:ShowPromptTip("存入数量大于当前金币数", 2.0);
+        return;
+    end
+    -- 发送存入金币HTTP请求
+    local t = {};
+    t.amount = self._amount;
+    local body = rapidjson.encode(t);
+    gm:AuthPost("/player/capital/deposit", body, self.OnDepositRespone);
+end
+
+function _module.OnDepositRespone(code, text)
+    local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code ~= 200) then
+        local err;
+        if (t.msg ~= nil) then
+            err = t.msg;
+        else
+            err = text;
+        end
+        gm:ShowPromptTip("存入金币失败：" .. err, 2.0);
+    else
+        gm.Gold = t.gold;
+        gm.Deposit = t.deposit;
+        if (self._hall ~= nil) then
+            self._hall:OnCapitalChange();
+        end
+        gm:ShowPromptTip("存入金币成功", 2.0);
+        self:Refresh();
+    end
+end
+
+
+return _module;

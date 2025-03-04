@@ -1,0 +1,126 @@
+-- 描述：逮狗腿聊天对话框脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.19
+
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child = obj.transform:Find("Frame/Bg");
+    local child1 = nil;
+    local child2 = nil;
+	local ui = CS.NiuMa.LuaUGUI;
+	if (child ~= nil) then
+        child1 = child:Find("Emojis");
+        if (child1 ~= nil) then
+		    for i = 1, 9 do
+			    child2 = child1:Find(string.format("Emoji%02d", i));
+			    if (child2 ~= nil) then
+				    ui.AddBtnAction(child2.gameObject, self.OnEmojiClick, i);
+			    end
+		    end
+        end
+        child1 = child:Find("Phrases/Bottom/Viewport/Content");
+	    if (child1 ~= nil) then
+		    for i = 1, 13 do
+			    child2 = child1:Find(string.format("Phrase%02d", i));
+			    if (child2 ~= nil) then
+				    ui.AddBtnAction(child2.gameObject, self.OnPhraseClick, i);
+			    end
+		    end
+	    end
+        child1 = child:Find("Input");
+	    if (child1 ~= nil) then
+		    self._inputField = child1.gameObject;
+		    child2 = child1:Find("Tip");
+		    if (child2 ~= nil) then
+			    self._labelHint = child2.gameObject;
+		    end
+	    end
+        child1 = child:Find("BtnSend");
+	    if (child1 ~= nil) then
+		    ui.AddBtnClick(child1.gameObject, self.OnChatSendClick);
+	    end
+	end
+	self._showHint = true;
+end
+
+function _module:Start()
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+function _module:Update()
+	if (self._inputField == nil or self._labelHint == nil) then
+        return;
+	end
+	local ui = CS.NiuMa.LuaUGUI;
+	local focused = ui.GetInputFocused(self._inputField);
+    if (self._showHint) then
+        if (focused) then
+            self._labelHint:SetActive(false);
+            self._showHint = false;
+        end
+    elseif (not focused) then
+        local text = ui.GetInputText(self._inputField);
+        if (text == nil or #text == 0) then
+            self._labelHint:SetActive(true);
+            self._showHint = true;
+        end
+    end
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module.OnEmojiClick(idx)
+	local self = _module;
+	self:SendChatMessage(1, idx, "");
+	self:Show(false);
+end
+
+function _module.OnPhraseClick(idx)
+	local self = _module;
+	self:SendChatMessage(2, idx, "");
+	self:Show(false);
+end
+
+function _module:SendChatMessage(type_, idx, text)
+	local gm = CS.NiuMa.GameManager.Instance;
+    local nm = CS.NiuMa.NetworkManager.Instance;
+	local msg = {};
+	msg.venueId = gm.VenueId;
+	msg.type = type_;
+	msg.index = idx;
+	msg.text = text;
+	local json = rapidjson.encode(msg);
+	nm:SendMessage("MsgChatClient", json, true);
+end
+
+function _module:OnCloseClick()
+	self:Show(false);
+end
+
+function _module.OnChatSendClick()
+	local self = _module;
+	if (self._inputField == nil) then
+		return;
+	end
+	local ui = CS.NiuMa.LuaUGUI;
+	local text = ui.GetInputText(self._inputField);
+    if (text == nil or #text == 0) then
+		return;
+	end
+	ui.SetInputText(self._inputField, "");
+	self:SendChatMessage(3, 0, text);
+	self:Show(false);
+end
+
+return _module;

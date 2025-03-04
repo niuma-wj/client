@@ -1,0 +1,150 @@
+-- 描述：麻将玩家位置界面
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.10
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local ui = CS.NiuMa.LuaUGUI;
+	local child = obj.transform:Find("Frame/BtnClose");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnCloseClick);
+	end
+	child = obj.transform:Find("Frame/EmptyMap/Ren4");
+	local child1 = nil;
+	self._textNames = {};
+	self._textIPs = {};
+	self._textDistances = {};
+	self._lines = {};
+	if (child ~= nil) then
+		for i = 1, 4 do
+			child1 = child:Find("TextName"..i);
+			if (child1 ~= nil) then
+				self._textNames[i] = child1.gameObject;
+			end
+			child1 = child:Find("TextIP"..i);
+			if (child1 ~= nil) then
+				self._textIPs[i] = child1.gameObject;
+			end
+		end
+		child1 = child:Find("TextDist12");
+		if (child1 ~= nil) then
+			self._textDistances[1] = child1.gameObject;
+		end
+		child1 = child:Find("TextDist13");
+		if (child1 ~= nil) then
+			self._textDistances[2] = child1.gameObject;
+		end
+		child1 = child:Find("TextDist14");
+		if (child1 ~= nil) then
+			self._textDistances[3] = child1.gameObject;
+		end
+		child1 = child:Find("TextDist23");
+		if (child1 ~= nil) then
+			self._textDistances[4] = child1.gameObject;
+		end
+		child1 = child:Find("TextDist24");
+		if (child1 ~= nil) then
+			self._textDistances[5] = child1.gameObject;
+		end
+		child1 = child:Find("TextDist34");
+		if (child1 ~= nil) then
+			self._textDistances[6] = child1.gameObject;
+		end
+		child1 = child:Find("Line12");
+		if (child1 ~= nil) then
+			self._lines[1] = child1.gameObject;
+		end
+		child1 = child:Find("Line13");
+		if (child1 ~= nil) then
+			self._lines[2] = child1.gameObject;
+		end
+		child1 = child:Find("Line14");
+		if (child1 ~= nil) then
+			self._lines[3] = child1.gameObject;
+		end
+		child1 = child:Find("Line23");
+		if (child1 ~= nil) then
+			self._lines[4] = child1.gameObject;
+		end
+		child1 = child:Find("Line24");
+		if (child1 ~= nil) then
+			self._lines[5] = child1.gameObject;
+		end
+		child1 = child:Find("Line34");
+		if (child1 ~= nil) then
+			self._lines[6] = child1.gameObject;
+		end
+	end
+end
+
+function _module:Start()
+	self.gameObject:SetActive(false);
+end
+
+function _module.OnCloseClick()
+	local self = _module;
+	self.gameObject:SetActive(false);
+end
+
+function _module:SetName(clientSeat, name)
+	if (self._textNames[clientSeat] ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textNames[clientSeat], name);
+	end
+end
+
+function _module:SetIP(clientSeat, ip)
+	if (self._textIPs[clientSeat] ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textIPs[clientSeat], ip);
+	end
+end
+
+function _module:SetDistance(pos, dist)
+	if (self._textDistances[pos] ~= nil) then
+		local ui = CS.NiuMa.LuaUGUI;
+		if (dist < 0) then
+			ui.SetText(self._textDistances[pos], "未知");
+		else
+			ui.SetText(self._textDistances[pos], tostring(dist));
+		end
+		if (dist < 0 or dist > 500) then
+			ui.SetTextColor(self._textDistances[pos], CS.UnityEngine.Color(0.0, 0.0, 0.0, 1.0));
+			if (self._lines[pos] ~= nil) then
+				ui.SetImageColor(self._lines[pos], CS.UnityEngine.Color(0.0, 0.5, 0.0, 1.0));
+			end
+		else
+			ui.SetTextColor(self._textDistances[pos], CS.UnityEngine.Color(1.0, 0.0, 0.0, 1.0));
+			if (self._lines[pos] ~= nil) then
+				ui.SetImageColor(self._lines[pos], CS.UnityEngine.Color(1.0, 0.0, 0.0, 1.0));
+			end
+		end
+	end
+end
+
+function _module:ResetDistance(pos)
+	local ui = CS.NiuMa.LuaUGUI;
+	if (self._textDistances[pos] ~= nil) then
+		ui.SetText(self._textDistances[pos], "");
+	end
+	if (self._lines[pos] ~= nil) then
+		ui.SetImageColor(self._lines[pos], CS.UnityEngine.Color(0.0, 0.5, 0.0, 1.0));
+	end
+end
+
+function _module:SetIPColor(clientSeat, black)
+	if (self._textIPs[clientSeat] ~= nil) then
+		local clr = nil;
+		if (black) then
+			clr = CS.UnityEngine.Color(0.0, 0.0, 0.0, 1.0);
+		else
+			clr = CS.UnityEngine.Color(1.0, 0.0, 0.0, 1.0);
+		end
+		CS.NiuMa.LuaUGUI.SetTextColor(self._textIPs[pos], clr);
+	end
+end
+
+return _module;

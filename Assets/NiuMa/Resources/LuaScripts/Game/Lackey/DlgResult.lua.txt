@@ -1,0 +1,256 @@
+-- 描述：逮狗腿牌局结算对话框脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.05
+
+local base = require 'BehaviourBase';
+local Player = require 'Game.Lackey.ResultPlayer';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	self._screenshot = obj:GetComponent("Screenshot2PhotoAlbum");
+    local child = obj.transform:Find("Content");
+    local child1 = nil;
+    local child2 = nil;
+    if (child ~= nil) then
+        self._content = child.gameObject;
+        child1 = child:Find("Light");
+        if (child1 ~= nil) then
+            self._lightBall = {};
+            self._lightMask = {};
+            self._lightLine = {};
+            for i = 1, 2 do
+                child2 = child1:Find("Ball/Ball" .. i);
+                if (child2 ~= nil) then
+                    self._lightBall[i] = child2.gameObject;
+                end
+                child2 = child1:Find("Mask" .. i);
+                if (child2 ~= nil) then
+                    self._lightMask[i] = child2.gameObject;
+                end
+                child2 = child1:Find("Line" .. i);
+                if (child2 ~= nil) then
+                    self._lightLine[i] = child2.gameObject;
+                end
+            end
+            child2 = child1:Find("Win");
+            if (child2 ~= nil) then
+                self._titleWin = child2.gameObject;
+            end
+            child2 = child1:Find("Lost");
+            if (child2 ~= nil) then
+                self._titleLost = child2.gameObject;
+            end
+            child2 = child1:Find("Draw");
+            if (child2 ~= nil) then
+                self._titleDraw = child2.gameObject;
+            end
+        end
+        child1 = child:Find("Bg");
+        if (child1 ~= nil) then
+            child2 = child1:Find("Digit/TextDiZhu");
+            if (child2 ~= nil) then
+                self._textDiZhu = child2.gameObject;
+            end
+            child2 = child1:Find("Digit/TextBeiLv");
+            if (child2 ~= nil) then
+                self._textBeiLv = child2.gameObject;
+            end
+            self._players = {};
+            for i = 1, 5 do
+                child2 = child1:Find("Player0" .. i);
+                if (child2 ~= nil) then
+                    self._players[i] = Player.NewInstance();
+                    self._players[i].gameObject = child2.gameObject;
+                    self._players[i]:Awake();
+                end
+            end
+        end
+        child1 = child:Find("BtnClose");
+        local ui = CS.NiuMa.LuaUGUI;
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnCloseClick);
+        end
+        child1 = child:Find("BtnNext");
+        if (child1 ~= nil) then
+            self._btnNext = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnNextClick);
+        end
+        child1 = child:Find("BtnBack");
+        if (child1 ~= nil) then
+            self._btnBack = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnBackClick);
+        end
+		child1 = child:Find("BtnSave");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnSavePictureClick);
+        end
+        child1 = child:Find("Kick");
+        if (child1 ~= nil) then
+            self._kickTip = child1.gameObject;
+        end
+        child1 = child:Find("1v4");
+        if (child1 ~= nil) then
+            self._1v4 = child1.gameObject;
+        end
+    end
+end
+
+function _module:Start()
+    local toucher = self.gameObject:GetComponent("PanelToucher");
+    if (toucher ~= nil) then
+        toucher:AddPointerHandler(true, self.OnPointerDown);
+        toucher:AddPointerHandler(false, self.OnPointerUp);
+    end
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+    if (s and self._content ~= nil) then
+        self._content:SetActive(true);
+    end
+end
+
+function _module.OnPointerDown()
+    local self = _module;
+    if (self._content ~= nil) then
+        self._content:SetActive(false);
+    end
+end
+
+function _module.OnPointerUp()
+    local self = _module;
+    if (self._content ~= nil) then
+        self._content:SetActive(true);
+    end
+end
+
+function _module:float_equal(x, v)
+    local EPSILON = 0.0001;
+    return ((v - EPSILON) < x) and (x < ( v + EPSILON));
+end
+
+function _module:OnLackeyResult(msg, headTexs, names, diZhu, seat, landlord, lackey, winOrLose)
+	if (self._lightBall[1] ~= nil) then
+		self._lightBall[1]:SetActive(winOrLose == 1);
+	end
+	if (self._lightMask[1] ~= nil) then
+		self._lightMask[1]:SetActive(winOrLose == 1);
+	end
+	if (self._lightLine[1] ~= nil) then
+		self._lightLine[1]:SetActive(winOrLose == 1);
+	end
+	if (self._lightBall[2] ~= nil) then
+		self._lightBall[2]:SetActive(winOrLose ~= 1);
+	end
+	if (self._lightMask[2] ~= nil) then
+		self._lightMask[2]:SetActive(winOrLose ~= 1);
+	end
+	if (self._lightLine[2] ~= nil) then
+		self._lightLine[2]:SetActive(winOrLose ~= 1);
+	end
+	if (self._titleWin ~= nil) then
+		self._titleWin:SetActive(winOrLose == 1);
+	end
+	if (self._titleLost ~= nil) then
+		self._titleLost:SetActive(winOrLose == 2);
+	end
+	if (self._titleDraw ~= nil) then
+		self._titleDraw:SetActive(winOrLose == 0);
+	end
+    local ui = CS.NiuMa.LuaUGUI;
+    if (self._textDiZhu ~= nil) then
+        ui.SetText(self._textDiZhu, tostring(diZhu));
+    end
+    if (self._textBeiLv ~= nil) then
+        ui.SetText(self._textBeiLv, tostring(msg.beiLv));
+    end
+	if (self._1v4 ~= nil) then
+		self._1v4:SetActive(landlord == lackey);
+	end
+    for i = 1, 5 do
+        local data = msg.results[i];
+        if ((self._players[i] ~= nil) and (data ~= nil)) then
+            self._players[i]:SetHeadTexture(headTexs[i]);
+            self._players[i]:SetName(names[i]);
+            self._players[i]:SetMySellf(i == seat + 1);
+            self._players[i]:SetBanker(i == landlord + 1);
+			if ((i ~= landlord + 1) and (i == lackey + 1)) then
+				self._players[i]:SetLackey(true);
+			else
+				self._players[i]:SetLackey(false);
+			end
+            if ((i == landlord + 1) or (i == lackey + 1)) then
+                self._players[i]:SetCamp(true);
+            else
+                self._players[i]:SetCamp(false);
+            end
+            self._players[i]:SetShowCard(data.showCard);
+            self._players[i]:SetFirst(i == msg.first + 1);
+            self._players[i]:SetXiQian(data.xiQian);
+            self._players[i]:SetScore(data.score);
+            self._players[i]:SetWinGold(data.winGold);
+            if (data.gold < diZhu) then
+			    self._players[i]:SetBankrupt(true);
+            else
+                self._players[i]:SetBankrupt(false);
+            end
+        end
+    end
+    self._kick = msg.kick;
+    if (self._btnNext ~= nil) then
+        self._btnNext:SetActive(not msg.kick);
+    end
+    if (self._btnBack ~= nil) then
+        self._btnBack:SetActive(msg.kick);
+    end
+    if (self._kickTip ~= nil) then
+        self._kickTip:SetActive(msg.kick);
+    end
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+    if (self._kick) then
+        self:OnBackClick();
+    else
+        self:Show(false);
+        local nm = CS.NiuMa.NetworkManager.Instance;
+        --请求同步逮狗腿游戏数据
+	    nm:SendInnerMessage("MsgLackeySync");
+    end
+end
+
+function _module.OnNextClick()
+    local self = _module;
+    self:Show(false);
+	local nm = CS.NiuMa.NetworkManager.Instance;
+    --准备就绪
+    nm:SendInnerMessage("MsgPlayerReady");
+    --请求同步逮狗腿游戏数据
+	nm:SendInnerMessage("MsgLackeySync");
+end
+
+function _module.OnBackClick()
+    --请求退出房间
+    local nm = CS.NiuMa.NetworkManager.Instance;
+    if (nm:IsConnected()) then
+	    nm:SendInnerMessage("MsgLeaveVenue");
+    else
+        local gm = CS.NiuMa.GameManager.Instance;
+        gm:DestroyGameRoom();
+	    gm:GetCapital();
+    end
+end
+
+function _module.OnSavePictureClick()
+    local self = _module;
+	if (self._screenshot) then
+		self._screenshot:SaveScreenShot();
+	end
+end
+
+return _module;

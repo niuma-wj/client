@@ -1,0 +1,145 @@
+-- 描述：比鸡结算对话框界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.28
+
+local base = require 'BehaviourBase';
+local Item = require 'Game.BiJi.SettlementItem';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Frame");
+    local child1 = nil;
+    local child2 = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+    self._players = {};
+    if (child ~= nil) then
+        child1 = child:Find("PlayerList/Viewport/Content");
+        if (child1 ~= nil) then
+            for i = 1, 6 do
+                child2 = child1:Find("Player" .. i);
+                if (child2 ~= nil) then
+                    self._players[i] = Item.NewInstance();
+                    self._players[i].gameObject = child2.gameObject;
+                    self._players[i]:Awake();
+                end
+            end
+        end
+        child1 = child:Find("BtnLeave");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnLeaveClick);
+        end
+        child1 = child:Find("BtnStart");
+        if (child1 ~= nil) then
+			self._btnStart = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnStartClick);
+        end
+        child1 = child:Find("Clock/TextCountdown");
+        if (child1 ~= nil) then
+            self._textCountdown = child1.gameObject;
+        end
+        child1 = child:Find("TextTime");
+        if (child1 ~= nil) then
+            self._textTime = child1.gameObject;
+        end
+		child1 = child:Find("TextLeave");
+        if (child1 ~= nil) then
+            self._textLeave = child1.gameObject;
+        end
+    end
+end
+
+function _module:Start()
+    for i = 1, 6 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:Start();
+        end
+    end
+    self:Show(false);
+end
+
+function _module:Update()
+    if (not self._countdowning) then
+        return;
+    end
+    self._countdown = self._countdown - CS.UnityEngine.Time.unscaledDeltaTime;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (self._countdown > 0) then
+        local sec = math.floor(self._countdown + 0.5);
+		if (self._textCountdown ~= nil) then
+            ui.SetText(self._textCountdown, tostring(sec));
+        end
+	else
+		self._countdowning = false;
+        if (self._textCountdown ~= nil) then
+            ui.SetText(self._textCountdown, "");
+        end
+    end
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetRoom(r)
+	self._room = r;
+    for i = 1, 6 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:SetRoom(r);
+        end
+    end
+end
+
+function _module.OnLeaveClick()
+    --请求退出房间
+	local nm = CS.NiuMa.NetworkManager.Instance;
+	if (nm:IsConnected()) then
+		nm:SendInnerMessage("MsgLeaveVenue");
+    else
+        local gm = CS.NiuMa.GameManager.Instance;
+		gm:DestroyGameRoom();
+		gm:GetCapital();
+    end
+end
+
+function _module.OnStartClick()
+    local self = _module;
+    self:Show(false);
+    local nm = CS.NiuMa.NetworkManager.Instance;
+    nm:SendInnerMessage("MsgPlayerReady");
+    nm:SendInnerMessage("MsgBiJiSync");
+end
+
+function _module:OnSettlement(msg, names, textures, commander)
+    local nums = #(msg.settlements);
+    for i = 1, nums do
+        if (self._players[i] ~= nil) then
+            self._players[i]:Show(true);
+            self._players[i]:SetName(names[i]);
+            self._players[i]:SetHeadTexture(textures[i]);
+            self._players[i]:SetOwner(i == commander);
+            self._players[i]:SetSettlement(msg.settlements[i]);
+        end
+    end
+    for i = nums + 1, 6 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:Show(false);
+        end
+    end
+    self._countdown = 9.8;
+    self._countdowning = true;
+    if (self._textTime ~= nil) then
+        local time = CS.NiuMa.Utility.GetTimeMMddHHmm();
+		CS.NiuMa.LuaUGUI.SetText(self._textTime, time);
+	end
+	if (self._btnStart ~= nil) then
+		self._btnStart:SetActive(not msg.kick);
+	end
+	if (self._textLeave ~= nil) then
+		self._textLeave:SetActive(msg.kick);
+	end
+end
+
+return _module;

@@ -1,0 +1,1672 @@
+-- 描述：麻将房间模块
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.10
+
+local base = require 'BehaviourBase';
+local com_def = require 'Common.Defines';
+local mah_def = require 'Game.Mahjong.MahjongDefines';
+local paver = require 'Game.Mahjong.Paver';
+local steering = require 'Game.Mahjong.SteeringWheel';
+local pt_viewer = require 'Game.Mahjong.PlayTileViewer';
+local ao_menu = require 'Game.Mahjong.ActionOptionMenu';
+local tp = require 'Game.Mahjong.TingPai';
+local nt = require 'Game.Mahjong.NextTile';
+local Player = require 'Game.Mahjong.Player';
+local DlgPlayerInfo = require 'Game.Mahjong.DlgPlayerInfo';
+local DlgChat = require 'Game.Mahjong.DlgChat';
+local DlgJieSuan = require 'Game.Mahjong.DlgJieSuan';
+local DlgLocation = require 'Game.Mahjong.DlgLocation';
+local DlgSetting = require 'Game.Mahjong.DlgSetting';
+local DlgDisband = require 'Game.Mahjong.DlgDisband';
+local Playback = require 'Game.Mahjong.Playback';
+local EffectShip = require 'Game.Mahjong.EffectShip';
+local AudioControl = require 'Game.Mahjong.AudioControl';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+_module.messages = "MsgMahjongSyncResp,MsgAddAvatar,MsgRemoveAvatar,"..
+"MsgLeaveVenueResp,MsgAvatarConnect,MsgPlayerReadyResp,MsgGetDistancesResp,"..
+"MsgMahjongStartRound,MsgMahjongTiles,MsgActorUpdated,MsgFetchTile,MsgWaitAction,"..
+"MsgActionOption,MsgActionOptionFinish,MsgPlayTile,MsgGangTile,"..
+"MsgPengChiTile,MsgTingTile,MsgHuTile,MsgShowTiles,MsgPassTip,"..
+"MsgMahjongSettlement,MsgChatServer,MsgPlayerVoice,MsgEffectServer,"..
+"MsgMahjongDisbandVote,MsgDisbandChoice,MsgDisbandObsolete,MsgDisband";
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child1 = obj.transform:Find("Base");
+	local child2 = nil;
+	local child3 = nil;
+	local ui = CS.NiuMa.LuaUGUI;
+	if (child1 ~= nil) then
+		child2 = child1:Find("Sounds");
+		if (child2 ~= nil) then
+			self._soundGames = {};
+			self._soundPhrases = {};
+			for i = 1, 4 do
+				child3 = child2:Find("SoundGame"..i);
+				if (child3 ~= nil) then
+					self._soundGames[i] = child3.gameObject:GetComponent("AudioSource");
+				end
+				child3 = child2:Find("SoundPhrase"..i);
+				if (child3 ~= nil) then
+					self._soundPhrases[i] = child3.gameObject:GetComponent("AudioSource");
+				end
+			end
+			child3 = child2:Find("SoundAlert");
+			if (child3 ~= nil) then
+				self._soundAlert = child3.gameObject:GetComponent("AudioSource");
+			end
+		end
+		child2 = child1:Find("Tiles");
+		if (child2 ~= nil) then
+			self._tiles = child2.gameObject;
+		end
+		child2 = child1:Find("RoomInfo/FangHao");
+		if (child2 ~= nil) then
+			child3 = child2:Find("TextRoomID");
+			if (child3 ~= nil) then
+				self._textRoomID = child3.gameObject;
+			end
+			child3 = child2:Find("TextTime");
+			if (child3 ~= nil) then
+				self._textTime = child3.gameObject;
+			end
+			child3 = child2:Find("TextMode");
+			if (child3 ~= nil) then
+				self._textMode = child3.gameObject;
+			end
+			child3 = child2:Find("TextWanFa");
+			if (child3 ~= nil) then
+				self._textWanFa = child3.gameObject;
+			end
+		end
+		child2 = child1:Find("RoomInfo/TileLeft");
+		if (child2 ~= nil) then
+			self._tileLeft = child2.gameObject;
+			child3 = child2:Find("TextTile");
+			if (child3 ~= nil) then
+				self._textTile = child3.gameObject;
+			end
+		end
+		child2 = child1:Find("RoomInfo/SteeringWheel");
+		if (child2 ~= nil) then
+			steering.gameObject = child2.gameObject;
+			steering:Awake();
+			self._steeringWheel = steering;
+		end
+		child2 = child1:Find("Buttons");
+		if (child2 ~= nil) then
+			child3 = child2:Find("BtnPrepare");
+			if (child3 ~= nil) then
+				self._btnPrepare = child3.gameObject;
+				ui.AddBtnClick(child3.gameObject, self.OnPrepareClick);
+			end
+			child3 = child2:Find("BtnSetting");
+			if (child3 ~= nil) then
+				ui.AddBtnClick(child3.gameObject, self.OnSettingClick);
+			end
+			child3 = child2:Find("BtnLocation");
+			if (child3 ~= nil) then
+				self._btnLocation = child3.gameObject;
+				ui.AddBtnClick(child3.gameObject, self.OnLocationClick);
+			end
+			child3 = child2:Find("BtnChat");
+			if (child3 ~= nil) then
+				self._btnChat = child3.gameObject;
+				ui.AddBtnClick(child3.gameObject, self.OnChatClick);
+			end
+			child3 = child2:Find("BtnYuYin");
+			if (child3 ~= nil) then
+				self._btnYuYin = child3.gameObject;
+			end
+			child3 = child2:Find("BtnActionGuo");
+			if (child3 ~= nil) then
+				self._btnActionGuo = child3.gameObject;
+				ui.AddBtnClick(child3.gameObject, self.OnGuoClick);
+			end
+			child3 = child2:Find("BtnActionChi");
+			if (child3 ~= nil) then
+				self._btnActionChi = child3.gameObject;
+				ui.AddBtnClick(child3.gameObject, self.OnChiClick);
+			end
+			child3 = child2:Find("BtnActionPeng");
+			if (child3 ~= nil) then
+				self._btnActionPeng = child3.gameObject;
+				ui.AddBtnClick(child3.gameObject, self.OnPengClick);
+			end
+			child3 = child2:Find("BtnActionGang");
+			if (child3 ~= nil) then
+				self._btnActionGang = child3.gameObject;
+				ui.AddBtnClick(child3.gameObject, self.OnGangClick);
+			end
+			child3 = child2:Find("BtnActionHu");
+			if (child3 ~= nil) then
+				self._btnActionHu = child3.gameObject;
+				ui.AddBtnClick(child3.gameObject, self.OnHuClick);
+			end
+			child3 = child2:Find("ActionOptionMenu");
+			if (child3 ~= nil) then
+				ao_menu.gameObject = child3.gameObject;
+				ao_menu:Awake();
+				self._actionOptionMenu = ao_menu;
+			end
+			self._playTileViewers = {};
+			for i = 1, 4 do
+				child3 = child2:Find("PlayTile0"..i);
+				if (child3 ~= nil) then
+					self._playTileViewers[i] = pt_viewer.NewInstance();
+					self._playTileViewers[i].gameObject = child3.gameObject;
+					self._playTileViewers[i]:Awake();
+				end
+			end
+            child3 = child2:Find("TingPai");
+			if (child3 ~= nil) then
+				tp.gameObject = child3.gameObject;
+				tp:Awake();
+				self._tingPai = tp;
+			end
+			child3 = child2:Find("MoPai");
+			if (child3 ~= nil) then
+				nt.gameObject = child3.gameObject;
+				nt:Awake();
+				self._nextTile = nt;
+			end
+			child3 = child2:Find("Playback");
+			if (child3 ~= nil) then
+				Playback.gameObject = child3.gameObject;
+				Playback:Awake();
+				self._playback = Playback;
+			end
+		end
+		self._players = {};
+		for i = 1, 4 do
+			child2 = child1:Find("Players/Player0"..i);
+			if (child2 ~= nil) then
+				self._players[i] = Player.NewInstance();
+				self._players[i].gameObject = child2.gameObject;
+				self._players[i]:Awake();
+				if (i > 1) then
+					child2 = child2:Find("HeadFrame");
+					if (child2 ~= nil) then
+						ui.AddBtnClick(child2.gameObject, self["OnPlayer"..i.."Click"]);
+					end
+				end
+			end
+		end
+        child2 = child1:Find("Effects");
+        if (child2 ~= nil) then
+            self._effectParent = child2;
+        end
+	end
+	child1 = obj.transform:Find("Popup");
+	if (child1 ~= nil) then
+		child2 = child1:Find("DlgPlayerInfo");
+		if (child2 ~= nil) then
+			DlgPlayerInfo.gameObject = child2.gameObject;
+			DlgPlayerInfo:Awake();
+			self._dlgPlayerInfo = DlgPlayerInfo;
+		end
+		child2 = child1:Find("DlgChat");
+		if (child2 ~= nil) then
+			DlgChat.gameObject = child2.gameObject;
+			DlgChat:Awake();
+			self._dlgChat = DlgChat;
+		end
+		child2 = child1:Find("DlgJieSuan");
+		if (child2 ~= nil) then
+			DlgJieSuan.gameObject = child2.gameObject;
+			DlgJieSuan:Awake();
+			self._dlgJieSuan = DlgJieSuan;
+		end
+		child2 = child1:Find("DlgLocation");
+		if (child2 ~= nil) then
+			DlgLocation.gameObject = child2.gameObject;
+			DlgLocation:Awake();
+			self._dlgLocation = DlgLocation;
+		end
+		child2 = child1:Find("DlgSetting");
+		if (child2 ~= nil) then
+			DlgSetting.gameObject = child2.gameObject;
+			DlgSetting:Awake();
+			self._dlgSetting = DlgSetting;
+		end
+		child2 = child1:Find("DlgDisband");
+		if (child2 ~= nil) then
+			DlgDisband.gameObject = child2.gameObject;
+			DlgDisband:Awake();
+			self._dlgDisband = DlgDisband;
+		end
+	end
+	self._mode = 0;
+	self._playerPositions = {};
+	self._playerPositions[1] = CS.UnityEngine.Vector2(-660.0, -100.0);
+	self._playerPositions[2] = CS.UnityEngine.Vector2(660.0, 92.0);
+	self._playerPositions[3] = CS.UnityEngine.Vector2(-420.0, 314.0);
+	self._playerPositions[4] = CS.UnityEngine.Vector2(-660.0, 152.0);
+    self._effectID = 1;
+end
+
+function _module:Start()
+	self._audioCtrl = AudioControl.NewInstance();
+    self._audioCtrl:Initialize();
+	self._audioCtrl:SetAudioSources(self._soundGames, self._soundPhrases, self._soundAlert);
+	self:InitVoice();
+	if (self._steeringWheel ~= nil) then
+		self._steeringWheel:Start();
+		self._steeringWheel:SetAudioCtrl(self._audioCtrl);
+	end
+	if (self._tiles ~= nil) then
+		self._paver = paver.NewInstance();
+		self._paver:Init(self._tiles);
+		self._paver:SetRoom(self);
+	end
+	for i = 1, 4 do
+		if (self._playTileViewers[i] ~= nil) then	
+			self._playTileViewers[i]:Start();
+			self._playTileViewers[i]:SetMahjongSprites(self._tiles);
+		end
+	end
+    if (self._actionOptionMenu ~= nil) then
+        self._actionOptionMenu:SetRoom(self);
+        self._actionOptionMenu:SetMahjongSprites(self._tiles);
+    end
+	if (self._tingPai ~= nil) then
+		self._tingPai:SetMahjongSprites(self._tiles);
+	end
+	if (self._dlgPlayerInfo ~= nil) then
+		self._dlgPlayerInfo:Start();
+	end
+	if (self._dlgChat ~= nil) then
+		self._dlgChat:Start();
+	end
+	if (self._dlgJieSuan ~= nil) then
+		--self._dlgJieSuan:SetRoomID(GameManager.Instance.TableID);
+		self._dlgJieSuan:SetRoom(self);
+		self._dlgJieSuan:SetPaver(self._paver);
+		self._dlgJieSuan:SetMahjongSprites(self._tiles);
+		self._dlgJieSuan:Start();
+	end
+	if (self._dlgLocation ~= nil) then
+		self._dlgLocation:Start();
+	end
+	if (self._dlgSetting ~= nil) then
+		self._dlgSetting:Start();
+	end
+	if (self._dlgDisband ~= nil) then
+		self._dlgDisband:Start();
+	end
+	--从全局变量中获取回放数据
+	self._playbackData = mahjongPlaybackData;
+	if (self._playbackData ~= nil) then
+		--删除全局变量
+		mahjongPlaybackData = nil;
+		self:StartPlayback();
+	else
+		local nm = CS.NiuMa.NetworkManager.Instance;
+		--请求同步麻将游戏数据
+		nm:SendInnerMessage("MsgMahjongSync");
+	end
+end
+
+function _module:Update()
+	self:UpdateTime();
+	if (self._steeringWheel ~= nil) then
+		self._steeringWheel:Update();
+	end
+	for i = 1, 4 do
+		if (self._players[i] ~= nil and self._players[i].gameObject.activeSelf) then
+			self._players[i]:Update();
+		end
+		if (self._playTileViewers[i] ~= nil) then
+			self._playTileViewers[i]:Update();
+		end
+	end
+	self:UpdateJieSuanWait();
+
+	if (self._playbackData ~= nil and self._playback ~= nil) then
+		self._playback:Update();
+	end
+
+	if (self._dlgChat ~= nil and self._dlgChat.gameObject.activeSelf) then
+		self._dlgChat:Update();
+	end
+    if (self._dlgDisband ~= nil and self._dlgDisband.gameObject.activeSelf) then
+        self._dlgDisband:Update();
+    end
+end
+
+function _module:UpdateTime()
+	if (self._textTime == nil) then
+		return;
+	end
+	local strTime = CS.NiuMa.Utility.GetTimeMMddHHmm();
+	if self._strTime ~= strTime then
+		self._strTime = strTime;
+		CS.NiuMa.LuaUGUI.SetText(self._textTime, strTime);
+	end
+end
+
+function _module:SetGeolocation()
+	local gm = CS.NiuMa.GameManager.Instance;
+	if (not gm.Location) then
+		return;
+	end
+	local msg = {};
+	msg.venueId = gm.VenueId;
+	msg.latitude = gm.Latitude;
+	msg.longitude = gm.Longitude;
+	msg.altitude = gm.Altitude;
+	local json = rapidjson.encode(msg);
+	CS.NiuMa.NetworkManager.Instance:SendMessage("MsgPlayerGeolocation", json, true);
+end
+
+function _module:SetPlayback(data)
+	self._playbackData = data;
+end
+
+function _module:GetPaver()
+	return self._paver;
+end
+
+function _module:OnMessage(msgType, json)
+	print("Process message: "..msgType);
+	if (msgType == "MsgMahjongSyncResp") then
+		self:OnSyncResp(json);
+	elseif (msgType == "MsgAddAvatar") then
+		self:OnAddAvatar(json);
+	elseif (msgType == "MsgRemoveAvatar") then
+		self:OnRemoveAvatar(json);
+	elseif (msgType == "MsgLeaveVenueResp") then
+		self:OnLeaveVenueResp(json);
+	elseif (msgType == "MsgAvatarConnect") then
+		self:OnAvatarConnect(json);
+	elseif (msgType == "MsgPlayerReadyResp") then
+		self:OnPlayerReadyResp(json);
+	elseif (msgType == "MsgGetDistancesResp") then
+		self:OnGetDistancesResp(json);
+	elseif (msgType == "MsgMahjongStartRound") then
+		self:OnStartRound(json);
+	elseif (msgType == "MsgMahjongTiles") then
+		self:OnDealTiles(json);
+	elseif (msgType == "MsgActorUpdated") then
+		self:OnActorUpdated(json);
+	elseif (msgType == "MsgFetchTile") then
+		self:OnFetchTile(json);
+	elseif (msgType == "MsgWaitAction") then
+		self:OnWaitingAction(json);
+	elseif (msgType == "MsgActionOption") then
+		self:OnActionOption(json);
+	elseif (msgType == "MsgActionOptionFinish") then
+		self:OnActionOptionFinish();
+	elseif (msgType == "MsgPlayTile") then
+		self:OnPlayTile(json);
+    elseif (msgType == "MsgGangTile") then
+        self:OnGangTile(json);
+    elseif (msgType == "MsgPengChiTile") then
+        self:OnPengChiTile(json);
+    elseif (msgType == "MsgTingTile") then
+        self:OnTingTile(json);
+    elseif (msgType == "MsgHuTile") then
+        self:OnHuTile(json);
+    elseif (msgType == "MsgShowTiles") then
+        self:OnShowTiles(json);
+    elseif (msgType == "MsgPassTip") then
+        self:OnPassTip(json);
+	elseif (msgType == "MsgMahjongSettlement") then
+		self:OnSettlement(json);
+	elseif (msgType == "MsgChatServer") then
+		self:OnChatServer(json);
+	elseif (msgType == "MsgPlayerVoice") then
+		self:OnPlayerVoice(json);
+	elseif (msgType == "MsgEffectServer") then
+		self:OnEffectServer(json);
+    elseif (msgType == "MsgMahjongDisbandVote") then
+        self:OnDisbandVote(json);
+    elseif (msgType == "MsgDisbandChoice") then
+        self:OnDisbandChoice(json);
+    elseif (msgType == "MsgDisbandObsolete") then
+        self:OnDisbandObsolete();
+    elseif (msgType == "MsgDisband") then
+        self:OnDisbandRoom();
+	end
+end
+
+function _module:OnReconnect()
+	if (self._playbackData == nil) then
+		local nm = CS.NiuMa.NetworkManager.Instance;
+		--请求同步麻将游戏数据
+		nm:SendInnerMessage("MsgMahjongSync");
+	end
+end
+
+function _module:OnSyncResp(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local ui = CS.NiuMa.LuaUGUI;
+	local msg = rapidjson.decode(json);
+	self._number = msg.number;
+	if (self._textRoomID ~= nil) then
+		ui.SetText(self._textRoomID, "ID:"..msg.number);
+	end
+	--金币数量，包含在房间内的押金
+	self._gold = msg.gold;
+	CS.NiuMa.GameManager.Instance.Diamond = msg.diamond;
+	if (self._textMode ~= nil) then
+		local strMode;
+		if (msg.mode == 0) then
+			strMode = "扣钻，底分";
+		else
+			strMode = "抽水，底分";
+		end
+		strMode = strMode..tostring(msg.diZhu).."金";
+		ui.SetText(self._textMode, strMode);
+	end
+	if (self._textWanFa ~= nil) then
+		local strWanFa;
+		if (msg.chi) then
+			strWanFa = "可吃，";
+		else
+			strWanFa = "不可吃，";
+		end
+		if (msg.dianPao) then
+			strWanFa = strWanFa.."可放炮";
+		else
+			strWanFa = strWanFa.."不可放炮";
+		end
+		ui.SetText(self._textWanFa, strWanFa);
+	end
+	if (self._dlgJieSuan ~= nil) then
+		self._dlgJieSuan:SetDiZhu(msg.diZhu);
+	end
+	--本机玩家的服务器座位号(0~3)
+	self._mode = msg.mode;
+	self._seat = msg.seat;
+	self._roundState = msg.roundState;
+	self._disbandState = msg.disbandState;
+	self._banker = msg.banker;
+	if (self._players[1] ~= nil) then
+		self._players[1]:SetGold(msg.gold);
+		self._players[1]:ShowDiamond(msg.mode == 0);
+		if (msg.mode == 0) then
+			self._players[1]:SetDiamond(msg.diamond);
+		end
+	end
+	if (self._roundState == com_def.StageState.Underway) then
+		local clientSeat = self:Server2ClientSeat(self._banker);
+		if (self._players[clientSeat] ~= nil) then
+			self._players[clientSeat]:SetBanker(true);
+		end
+		if (self._tileLeft ~= nil) then
+			self._tileLeft:SetActive(true);
+		end
+		if (self._steeringWheel ~= nil) then
+			self._steeringWheel:Show(true);
+		end
+		if (self._textTile ~= nil) then
+			ui.SetText(self._textTile, tostring(msg.leftTiles));
+		end
+		self:SyncTableTiles(msg);
+	end
+	self:SetGeolocation();
+end
+
+function _module:SyncTableTiles(msg)
+	if (msg == nil) then
+		return;
+	end
+	if (msg.hasFetch) then
+		local key = nil;
+		for i, v in ipairs(msg.handTiles) do
+			if (v.id == msg.fetchTile.id) then
+				key = i;
+				break;
+			end
+		end
+		if (key ~= nil) then
+			table.remove(msg.handTiles, key);
+		end
+	end
+	self._paver:CreateLocalHandTiles(msg.handTiles);
+	if (msg.hasFetch) then
+		self._paver:CreateFetchTile(1, msg.fetchTile);
+	end
+	for i = 0, 3 do
+		if (i ~= self._seat) then
+			local clientSeat = self:Server2ClientSeat(i);
+			local nums = msg.handTileNums[i + 1];
+			local tmp = nums % 3;
+			if (tmp == 2) then
+				nums = nums - 1;
+				self._paver:CreateFetchTile(clientSeat);
+			end
+			self._paver:CreateOtherHandTiles(clientSeat, nums);
+		end
+	end
+	local tmpList = nil;
+	for i = 0, 3 do
+		tmpList = msg.chapters[i + 1];
+		local clientSeat = self:Server2ClientSeat(i);
+		self._paver:CreateChapters(clientSeat, tmpList);
+	end
+	for i = 0, 3 do
+		tmpList = msg.playedTiles[i + 1];
+		local clientSeat = self:Server2ClientSeat(i);
+		self._paver:CreatePlayedTiles(clientSeat, tmpList);
+	end
+end
+
+--服务器座位号(0~3)变换到客户端座位号(1~4)
+function _module:Server2ClientSeat(s)
+	if (self._seat == nil) then
+		return -1;
+	end
+	local clientSeat = s + 4 - self._seat;
+    clientSeat = (clientSeat % 4) + 1;
+	return clientSeat;
+end
+
+function _module:Client2ServerSeat(s)
+	if (self._seat == nil) then
+		return -1;
+	end
+	local seat = (s - 1 + self._seat) % 4;
+	return seat;
+end
+
+function _module:OnAddAvatar(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local count = #(msg.avatars);
+	for i = 1, count do
+		local info = msg.avatars[i];
+		local clientSeat = self:Server2ClientSeat(info.seat);
+		if (self._players[clientSeat] ~= nil) then
+			local text = CS.NiuMa.Utility.DecodeBase64(info.base64);
+			local extraInfo = rapidjson.decode(text);
+			self._players[clientSeat]:Show(true);
+			self._players[clientSeat]:SetPlayerId(info.playerId);
+			self._players[clientSeat]:SetGold(extraInfo.gold);
+			self._players[clientSeat]:SetOnline(not info.offline);
+			self._players[clientSeat]:SetReady(info.ready);
+			self._players[clientSeat]:SetSex(info.sex);
+			self._players[clientSeat]:SetName(info.nickname);
+			self._players[clientSeat]:SetHeadImgUrl(info.headUrl);
+			self._players[clientSeat]:SetAddress("");
+			self._players[clientSeat]:SetIP(extraInfo.ip);
+	
+			if (self._roundState == com_def.StageState.Underway) then
+				self._players[clientSeat]:HideReady();
+			end
+			if (clientSeat == 1 and self._btnPrepare ~= nil) then
+				self._btnPrepare:SetActive(not info.ready);
+			end
+		end
+	end
+end
+
+function _module:OnRemoveAvatar(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:Clear();
+	end
+end
+
+function _module:OnLeaveVenueResp(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	if (msg.result == 0) then
+		--离开成功，直接退出
+		self.ExitRoom();
+	else
+		--离开失败，请求解散
+		CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgDisbandRequest");
+	end
+end
+
+function _module:OnAvatarConnect(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:SetOnline(not msg.offline);
+	end
+end
+
+function _module:OnPlayerReadyResp(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:SetReady(true);
+	end
+	if (clientSeat == 1 and self._btnPrepare ~= nil) then
+		self._btnPrepare:SetActive(false);
+	end
+end
+
+function _module:ShowPlayerInfo(clientSeat)
+	if (self._playbackData ~= nil) then
+		--回放模式，无法查看玩家信息
+		return;
+	end
+	if ((self._dlgPlayerInfo == nil) or (self._players[clientSeat] == nil)) then
+		return;
+	end
+	local playerId = self._players[clientSeat]:GetPlayerId();
+	if (playerId == nil or #playerId == 0) then
+		return;
+	end
+	self._dlgPlayerInfo.gameObject:SetActive(true);
+	self._dlgPlayerInfo:SetHeadTexture(self._players[clientSeat]._texHead);
+	self._dlgPlayerInfo:SetSex(self._players[clientSeat]._sex);
+	self._dlgPlayerInfo:SetName(self._players[clientSeat]._name);
+	self._dlgPlayerInfo:SetPlayerId(playerId);
+	self._dlgPlayerInfo:SetIP(self._players[clientSeat]._ip);
+	self._dlgPlayerInfo:SetAddress(self._players[clientSeat]._address);
+end
+
+function _module.OnPlayer2Click()
+	local self = _module;
+	self:ShowPlayerInfo(2);
+end
+
+function _module.OnPlayer3Click()
+	local self = _module;
+	self:ShowPlayerInfo(3);
+end
+
+function _module.OnPlayer4Click()
+	local self = _module;
+	self:ShowPlayerInfo(4);
+end
+
+function _module.OnPrepareClick()
+	CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgPlayerReady");
+end
+
+function _module.OnSettingClick()
+	local self = _module;
+	if (self._dlgSetting ~= nil) then
+		self._dlgSetting.gameObject:SetActive(true);
+	end
+end
+
+function _module.OnLocationClick()
+	local self = _module;
+	if (self._dlgLocation == nil) then
+		return;
+	end
+	self._dlgLocation.gameObject:SetActive(true);
+	--获取玩家之间的距离
+	CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgGetDistances");
+	if (self._distances == nil) then
+		self._distances = {};
+		for i = 1, 6 do
+			self._distances[i] = -1;
+		end
+	end
+	local tmp1 = {};
+	local playerId = nil;
+	for i = 1, 4 do
+		if (self._players[i] ~= nil) then
+			playerId = self._players[i]:GetPlayerId();
+		else
+			playerId = nil;
+		end
+		if (playerId ~= nil and #playerId ~= 0) then
+			tmp1[#tmp1 + 1] = i;
+		end
+	end
+	for i = 1, #tmp1 do
+		self._dlgLocation:SetName(tmp1[i], self._players[tmp1[i]]._name);
+		self._dlgLocation:SetIP(tmp1[i], self._players[tmp1[i]]._ip);
+	end
+	local tmp2 = {};
+	for i = 1, #tmp1 do
+		if (i < #tmp1) then
+			for j = i + 1, #tmp1 do
+				if (self._players[tmp1[i]]._ip == self._players[tmp1[j]]._ip) then
+					tmp2[tmp1[i]] = true;
+					tmp2[tmp1[j]] = true;
+				end
+			end
+		end
+	end
+	for i = 1, #tmp1 do
+		if (tmp2[tmp1[i]]) then
+			self._dlgLocation:SetIPColor(tmp1[i], false);
+		else
+			self._dlgLocation:SetIPColor(tmp1[i], true);
+		end
+	end
+	self:RefreshDistances();
+end
+
+function _module:OnGetDistancesResp(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	for i = 1, 6 do
+		self._distances[i] = msg.distances[i];
+	end
+	self:RefreshDistances();
+end
+
+function _module:RefreshDistances()
+	if (self._dlgLocation == nil) then
+		return;
+	end
+	local tmp1 = {};
+	local playerId = nil;
+	for i = 1, 4 do
+		if (self._players[i] ~= nil) then
+			playerId = self._players[i]:GetPlayerId();
+		else
+			playerId = nil;
+		end
+		if (playerId ~= nil and #playerId ~= 0) then
+			tmp1[#tmp1 + 1] = i;
+		end
+	end
+	for i = 1, 6 do
+		self._dlgLocation:ResetDistance(i);
+	end
+	local tmp3 = { ['12'] = 1, ['13'] = 2, ['14'] = 3, ['23'] = 4, ['24'] = 5, ['34'] = 6 };
+	local seat1 = 0;
+	local seat2 = 0;
+	local seat3 = 0;
+	local pos1 = 0;
+	local pos2 = 0;
+	for i = 1, #tmp1 do
+		if (i < #tmp1) then
+			for j = i + 1, #tmp1 do
+				seat1 = self:Client2ServerSeat(tmp1[i]) + 1;
+				seat2 = self:Client2ServerSeat(tmp1[j]) + 1;
+				if (seat1 > seat2) then
+					seat3 = seat1;
+					seat1 = seat2;
+					seat2 = seat3;
+				end
+				pos1 = tmp3[seat1..seat2];
+				pos2 = tmp3[tmp1[i]..tmp1[j]];
+				self._dlgLocation:SetDistance(pos2, self._distances[pos1]);
+			end
+		end
+	end
+end
+
+function _module:OnStartRound(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	self._roundState = com_def.StageState.Underway;
+	self._banker = msg.banker;
+	local clientSeat = self:Server2ClientSeat(self._banker);
+	for i = 1, 4 do
+		if (self._players[i] ~= nil) then
+			self._players[i]:HideReady();
+			if (clientSeat == i) then
+				self._players[i]:SetBanker(true);
+			end
+		end
+	end
+	if (self._mode == 0) then
+		if (self._players[1] ~= nil) then
+			self._players[1]:SetDiamond(msg.diamond);
+		end
+		CS.NiuMa.GameManager.Instance.Diamond = msg.diamond;
+	end
+	if (self._tileLeft ~= nil) then
+		self._tileLeft:SetActive(true);
+	end
+	if (self._steeringWheel ~= nil) then
+		self._steeringWheel:Show(true);
+	end
+end
+
+function _module:OnDealTiles(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	self._paver:OnDealTiles(msg);
+end
+
+function _module:OnActorUpdated(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	self._actor = msg.actor;
+	if (self._steeringWheel ~= nil) then
+		local clientSeat = self:Server2ClientSeat(msg.actor);
+		self._steeringWheel:SetArrow(clientSeat);
+	end
+end
+
+function _module:OnFetchTile(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.player);
+	if (self._paver ~= nil) then
+		self._paver:CreateFetchTile(clientSeat, msg.tile);
+	end
+	if (self._textTile ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textTile, tostring(msg.nums));
+	end
+end
+
+function _module:OnWaitingAction(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	if (self._steeringWheel ~= nil) then
+		if (msg.waitting) then
+			local sec = 30 - msg.second;
+			print("alert: " .. tostring(msg.beingHeld));
+			self._steeringWheel:Countdown(sec, msg.beingHeld);
+		else
+			self._steeringWheel:EndCountdown();
+			self._steeringWheel:StopAlert();
+		end
+	end
+end
+
+function _module:OnActionOption(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local chi = false;
+    local peng = false;
+    local gang = false;
+    local hu = false;
+	for i, v in ipairs(msg.actionOptions) do
+		if (v.type == mah_def.MahjongAction.Peng) then
+            peng = true;
+        elseif ((v.type == mah_def.MahjongAction.ZhiGang) or
+            (v.type == mah_def.MahjongAction.JiaGang) or
+            (v.type == mah_def.MahjongAction.AnGang)) then
+            gang = true;
+        elseif (v.type == mah_def.MahjongAction.Chi) then
+            chi = true;
+        elseif ((v.type == mah_def.MahjongAction.DianPao) or
+            (v.type == mah_def.MahjongAction.ZiMo)) then
+            hu = true;
+		end
+	end
+	if (chi or peng or gang or hu) then
+        if (self._btnActionGuo ~= nil) then
+            self._btnActionGuo:SetActive(true);
+		end
+    end
+    local nX = -320;
+    if (chi) then
+        if (self._btnActionChi ~= nil) then
+            self._btnActionChi:SetActive(true);
+		end
+        nX = nX - 140;
+    end
+    if (peng) then
+        if (self._btnActionPeng ~= nil) then
+            self._btnActionPeng:SetActive(true);
+            local rcTrans = self._btnActionPeng.transform;
+            if (rcTrans ~= nil) then
+                rcTrans.anchoredPosition = CS.UnityEngine.Vector2(nX, 0.0);
+			end
+        end
+        nX = nX - 140;
+    end
+    if (gang) then
+        if (self._btnActionGang ~= nil) then
+            self._btnActionGang:SetActive(true);
+            local rcTrans = self._btnActionGang.transform;
+            if (rcTrans ~= nil) then
+                rcTrans.anchoredPosition = CS.UnityEngine.Vector2(nX, 0.0);
+			end
+        end
+        nX = nX - 140;
+    end
+    if (hu) then
+        if (self._btnActionHu ~= nil) then
+            self._btnActionHu:SetActive(true);
+            local rcTrans = self._btnActionHu.transform;
+            if (rcTrans ~= nil) then
+                rcTrans.anchoredPosition = CS.UnityEngine.Vector2(nX, 0.0);
+			end
+        end
+    end
+    self._actionOptions = msg.actionOptions;
+end
+
+function _module:OnActionOptionFinish()
+	if (self._btnActionGuo ~= nil) then
+        self._btnActionGuo:SetActive(false);
+	end
+    if (self._btnActionChi ~= nil) then
+        self._btnActionChi:SetActive(false);
+	end
+    if (self._btnActionPeng ~= nil) then
+        self._btnActionPeng:SetActive(false);
+	end
+    if (self._btnActionGang ~= nil) then
+        self._btnActionGang:SetActive(false);
+	end
+    if (self._btnActionHu ~= nil) then
+        self._btnActionHu:SetActive(false);
+	end
+    if (self._actionOptionMenu ~= nil) then
+        self._actionOptionMenu:Show(false);
+	end
+    self._actionOptions = nil;
+end
+
+function _module:DoPlayTile(tileId)
+	if (self._actionOptions == nil) then
+        return false;
+	end
+    if (self._actor ~= self._seat) then
+        return false;
+	end
+    local ma = nil;
+	for i, v in ipairs(self._actionOptions) do
+        if (v.type == mah_def.MahjongAction.Play) then
+            ma = v;
+            break;
+        end
+    end
+    if (ma == nil) then
+        return false;
+	end
+	self:TakeActionOption(ma.id, tileId);
+    return true;
+end
+
+function _module:OnPlayTile(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	if (self._paver == nil) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.actor);
+	self:OnPlayTile1(clientSeat, msg.tile, msg.handTiles);
+end
+
+function _module:OnPlayTile1(clientSeat, tile, handTiles)
+	self._paver:AddPlayedTile(clientSeat, tile, true);
+	self._paver:RemoveFetchTile(clientSeat);
+	if (self._playbackData ~= nil) then
+		self._paver:CreateShowTiles(clientSeat, handTiles);
+	elseif (clientSeat == 1) then
+		self._paver:CreateLocalHandTiles(handTiles);
+	end
+	if (self._playTileViewers[clientSeat] ~= nil) then
+		self._playTileViewers[clientSeat]:ShowTile(tile.tile);
+	end
+    if (self._audioCtrl ~= nil) then
+        local sex = self._players[clientSeat]:GetSex();
+        self._audioCtrl:PlayTile(clientSeat, tile.tile.pattern, tile.tile.number, (sex == 1));
+    end
+end
+
+function _module:OnGangTile(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	if (self._paver == nil) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat1 = self:Server2ClientSeat(msg.actor);
+    local clientSeat2 = self:Server2ClientSeat(msg.player);
+    self:OnGangTile1(msg.chapter, clientSeat1, clientSeat2, msg.chapters, msg.handTiles, msg.tileNums);
+end
+
+function _module:OnGangTile1(chapterType, clientSeat1, clientSeat2, chapters, handTiles, tileNums)
+    self._paver:CreateChapters(clientSeat1, chapters);
+    if (self._playbackData ~= nil) then
+        self._paver:CreateShowTiles(clientSeat1, handTiles);
+    elseif (clientSeat1 == 1) then
+        self._paver:CreateLocalHandTiles(handTiles);
+    else
+        self._paver:CreateOtherHandTiles(clientSeat1, tileNums);
+    end
+    if (chapterType == mah_def.MahjongChapter.AnGang or
+        chapterType == mah_def.MahjongChapter.JiaGang) then
+        self._paver:RemoveFetchTile(clientSeat1);
+    elseif (chapterType == mah_def.MahjongChapter.ZhiGang) then
+        self._paver:RemoveLastPlayedTile(clientSeat2);
+    end
+    self._paver:ShowActionEffect(clientSeat1, self._paver.ActionEffect.Gang);
+    if (self._audioCtrl ~= nil) then
+        local sex = self._players[clientSeat1]:GetSex();
+        self._audioCtrl:PlayAction(clientSeat1, mah_def.MahjongAction.ZhiGang, (sex == 1));
+    end
+end
+
+function _module:OnPengChiTile(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	if (self._paver == nil) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+    local chapter = {};
+	chapter.types = {};
+    if (msg.pengOrChi) then
+        table.insert(chapter.types, mah_def.MahjongChapter.Peng);
+    else
+        table.insert(chapter.types,mah_def.MahjongChapter.Chi);
+    end
+	chapter.tiles = {};
+	for i, v in ipairs(msg.tiles) do
+		local tmpTile = {};
+		tmpTile.tile = v.tile;
+		tmpTile.id = v.id;
+		table.insert(chapter.tiles, tmpTile);
+	end
+    chapter.targetPlayer = msg.player;
+	local clientSeat1 = self:Server2ClientSeat(msg.actor);
+    local clientSeat2 = self:Server2ClientSeat(msg.player);
+    self:OnPengChiTile1(msg.pengOrChi, clientSeat1, clientSeat2, chapter, msg.handTiles);
+end
+
+function _module:OnPengChiTile1(pengOrChi, clientSeat1, clientSeat2, chapter, handTiles)
+	if (chapter == nil) then
+		return;
+	end
+	self._paver:AddChapter(clientSeat1, chapter);
+    if (self._playbackData ~= nil) then
+        self._paver:CreateShowTiles(clientSeat1, handTiles);
+    elseif (clientSeat1 == 1) then
+        self._paver:CreateLocalHandTiles(handTiles);
+    else
+        local nums = self._paver:GetHandTileNums(clientSeat1) - 3;
+        self._paver:CreateOtherHandTiles(clientSeat1, nums);
+    end
+    self._paver:RemoveLastPlayedTile(clientSeat2);
+    if (pengOrChi) then
+        self._paver:ShowActionEffect(clientSeat1, self._paver.ActionEffect.Peng);
+    else
+        self._paver:ShowActionEffect(clientSeat1, self._paver.ActionEffect.Chi);
+    end
+    if (self._audioCtrl ~= nil) then
+        local sex = self._players[clientSeat1]:GetSex();
+        local action = mah_def.MahjongAction.Chi;
+        if (pengOrChi) then
+            action = mah_def.MahjongAction.Peng;
+        end
+        self._audioCtrl:PlayAction(clientSeat1, action, (sex == 1));
+    end
+end
+
+function _module:OnTingTile(json)
+    if (self._tingPai == nil) then
+		return;
+	end
+	if (json == nil or #json == 0) then
+		self._tingPai:Show(false);
+	else
+		local msg = rapidjson.decode(json);
+		local nums = #(msg.tiles);
+		if (nums < 1) then
+			self._tingPai:Show(false);
+		else
+			self._tingPai:Show(true);
+			self._tingPai:SetTingTiles(msg.tiles);
+		end
+	end
+end
+
+function _module:OnHuTile(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	if (self._paver == nil) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+	if (self._steeringWheel ~= nil) then
+		self._steeringWheel:EndCountdown();
+		self._steeringWheel:StopAlert();
+	end
+    self:OnHuTile1(msg);
+end
+
+function _module:OnHuTile1(msg)
+    local seat = -1;
+    local clientSeat = -1;
+    for i = 1, 3 do
+        seat = msg.players[i];
+        if (seat == -1) then
+            break;
+        end
+        clientSeat = self:Server2ClientSeat(seat);
+        if (msg.ziMo) then
+            self._paver:ShowActionEffect(clientSeat, self._paver.ActionEffect.ZiMo);
+        else
+            self._paver:ShowActionEffect(clientSeat, self._paver.ActionEffect.JiePao);
+        end
+    end
+    if (not msg.ziMo) then
+        clientSeat = self:Server2ClientSeat(msg.actor);
+        self._paver:ShowActionEffect(clientSeat, self._paver.ActionEffect.FangPao);
+    end
+    if (self._audioCtrl ~= nil) then
+        local sex = self._players[clientSeat]:GetSex();
+        local action = mah_def.MahjongAction.DianPao;
+        if (msg.ziMo) then
+            action = mah_def.MahjongAction.ZiMo;
+        end
+        self._audioCtrl:PlayAction(clientSeat, action, (sex == 1));
+    end
+end
+
+function _module:OnShowTiles(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	if (self._paver == nil) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    for i = 1, 4 do
+        local tiles = msg.handTiles[i];
+        if (tiles ~= nil) then
+            local clientSeat = self:Server2ClientSeat(i - 1);
+            self._paver:CreateShowTiles(clientSeat, tiles);
+        end
+    end
+end
+
+function _module:OnPassTip(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    local tip = "";
+    if (msg.action == 0) then
+        tip = "您此前过碰<color=#00FF01FF>"..msg.tile.."</color>，在下次摸牌之前不能碰该牌";
+    else
+        tip = "您此前过胡<color=#00FF01FF>"..msg.tile.."</color>，在下次摸牌之前不能接炮";
+    end
+    CS.NiuMa.GameManager.Instance:ShowPromptTip(tip, 5.0);
+end
+
+function _module:OnSettlement(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	if (self._dlgJieSuan == nil) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local names = {};
+	local clientSeat = 0;
+	for i = 1, 4 do
+		clientSeat = self:Server2ClientSeat(i - 1);
+		if (self._players[clientSeat] ~= nil) then
+			names[i] = self._players[clientSeat]:GetName();
+			self._players[clientSeat]:SetGold(msg.golds[i]);
+		end
+		if (clientSeat == 1) then
+			CS.NiuMa.GameManager.Instance.Gold = msg.golds[i];
+		end
+	end
+	self:OnSettlement1(msg.data, msg.winGolds, names, msg.kick, false);
+end
+
+function _module:OnSettlement1(data, winGolds, names, kick, playback)
+    if (self._dlgJieSuan ~= nil) then
+		if (playback and (self._playbackData ~= nil)) then
+			self._dlgJieSuan:SetPlaybackTime(self._playbackData.time);
+		end
+        self._dlgJieSuan:OnSettlement(data, winGolds, names, self._banker, kick, playback);
+		self._jieSuanWaiting = true;
+		self._jieSuanElapsed = 0.0;
+    end
+end
+
+function _module:UpdateJieSuanWait()
+	if (not self._jieSuanWaiting or self._dlgJieSuan == nil) then
+		return;
+	end
+	self._jieSuanElapsed = self._jieSuanElapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+	if (self._jieSuanElapsed > 3.0) then
+		self._dlgJieSuan:Show(true);
+		self._jieSuanWaiting = false;
+	end
+end
+
+function _module.OnGuoClick()
+	local self = _module;
+	CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgPassActionOption");
+	self:OnActionOptionFinish();
+end
+
+function _module.OnChiClick()
+	local self = _module;
+	if (self._actionOptions == nil) then
+		return;
+	end
+    local nums = 0;
+	local chiActions = {};
+	for i, v in ipairs(self._actionOptions) do
+		if (v.type == mah_def.MahjongAction.Chi) then
+            chiActions[nums + 1] = v;
+            nums = nums + 1;
+        end
+	end
+    if (nums < 1) then
+        return;
+    elseif (nums == 1) then
+        self:TakeActionOption(chiActions[1].id, 0);
+    elseif (self._actionOptionMenu ~= nil) then
+        self._actionOptionMenu:Show(true);
+        local trans1 = self._actionOptionMenu.gameObject.transform;
+        local trans2 = self._btnActionChi.transform;
+        if ((trans1 ~= nil) and (trans2 ~= nil)) then
+            trans1.anchoredPosition = CS.UnityEngine.Vector2(trans2.anchoredPosition.x, trans1.anchoredPosition.y);
+        end
+        self._actionOptionMenu:ShowActionOptions(chiActions);
+    end
+end
+
+function _module.OnPengClick()
+	local self = _module;
+    if (self._actionOptions == nil) then
+		return;
+	end
+    local peng = nil;
+    for i, v in ipairs(self._actionOptions) do
+		if (v.type == mah_def.MahjongAction.Peng) then
+            peng = v;
+            break;
+        end
+	end
+    if (peng == nil) then
+		return;
+	end
+    self:TakeActionOption(peng.id, 0);
+end
+
+function _module.OnGangClick()
+	local self = _module;
+    if (self._actionOptions == nil) then
+		return;
+	end
+    local nums = 0;
+	local gangActions = {};
+	for i, v in ipairs(self._actionOptions) do
+		if (v.type == mah_def.MahjongAction.ZhiGang or
+            v.type == mah_def.MahjongAction.JiaGang or
+            v.type == mah_def.MahjongAction.AnGang) then
+            gangActions[nums + 1] = v;
+            nums = nums + 1;
+        end
+	end
+    if (nums < 1) then
+        return;
+    elseif (nums == 1) then
+        self:TakeActionOption(gangActions[1].id, 0);
+    elseif (self._actionOptionMenu ~= nil) then
+        self._actionOptionMenu:Show(true);
+        local trans1 = self._actionOptionMenu.gameObject.transform;
+        local trans2 = self._btnActionChi.transform;
+        if ((trans1 ~= nil) and (trans2 ~= nil)) then
+            trans1.anchoredPosition = CS.UnityEngine.Vector2(trans2.anchoredPosition.x, trans1.anchoredPosition.y);
+        end
+        self._actionOptionMenu:ShowActionOptions(gangActions);
+    end
+end
+
+function _module.OnHuClick()
+	local self = _module;
+    if (self._actionOptions == nil) then
+		return;
+	end
+    local hu = nil;
+    for i, v in ipairs(self._actionOptions) do
+		if (v.type == mah_def.MahjongAction.DianPao or
+            v.type == mah_def.MahjongAction.ZiMo) then
+            hu = v;
+            break;
+        end
+	end
+    if (hu == nil) then
+		return;
+	end
+    self:TakeActionOption(hu.id, 0);
+end
+
+function _module:TakeActionOption(actionId, tileId)
+	local gm = CS.NiuMa.GameManager.Instance;
+    local msg = {};
+	msg.venueId = gm.VenueId;
+	msg.actionId = actionId;
+	msg.tileId = tileId or 0;
+	local json = rapidjson.encode(msg);
+	CS.NiuMa.NetworkManager.Instance:SendMessage("MsgDoActionOption", json, true);
+end
+
+--点击下一局
+function _module:OnNextRoundClick()
+	self._roundState = com_def.StageState.NotStarted;
+    if (self._players[1] ~= nil) then
+        self._players[1]:SetBanker(false);
+    end
+	for i = 2, 4 do
+		if (self._players[i] ~= nil) then
+			self._players[i]:Clear();
+		end
+	end
+	if (self._steeringWheel ~= nil) then
+		self._steeringWheel:Show(false);
+	end
+	if (self._tileLeft ~= nil) then
+		self._tileLeft:SetActive(false);
+	end
+	if (self._paver ~= nil) then
+		self._paver:ClearTable();
+	end
+	if (self._tingPai ~= nil) then
+		self._tingPai:Show(false);
+	end
+	local nm = CS.NiuMa.NetworkManager.Instance;
+	nm:SendInnerMessage("MsgPlayerReady");
+	nm:SendInnerMessage("MsgMahjongSync");
+end
+
+function _module.OnChatClick()
+	local self = _module;
+	if (self._dlgChat ~= nil) then
+		self._dlgChat:Show(true);
+	end
+end
+
+-- 开始回放
+function _module:StartPlayback()
+	if (self._playbackData == nil) then
+		return;
+	end
+	if (self._btnPrepare~= nil) then
+		self._btnPrepare:SetActive(false);
+	end
+	if (self._btnLocation~= nil) then
+		self._btnLocation:SetActive(false);
+	end
+	if (self._btnChat~= nil) then
+		self._btnChat:SetActive(false);
+	end
+	if (self._btnYuYin~= nil) then
+		self._btnYuYin:SetActive(false);
+	end
+	if (self._playback ~= nil) then
+		self._playback:Show(true);
+		self._playback:Start();
+	end
+	local gm = CS.NiuMa.GameManager.Instance;
+	local ui = CS.NiuMa.LuaUGUI;
+	if (self._textRoomID ~= nil) then
+		ui.SetText(self._textRoomID, "ID:"..self._playbackData.number);
+	end
+    if (self._textMode ~= nil) then
+		local strMode;
+		if (self._playbackData.mode == 0) then
+			strMode = "扣钻，底分";
+		else
+			strMode = "抽水，底分";
+		end
+		strMode = strMode..self._playbackData.diZhu.."金";
+		ui.SetText(self._textMode, strMode);
+	end
+	if (self._textWanFa ~= nil) then
+		local strWanFa;
+		local util = CS.NiuMa.Utility;
+		if (util.BitwiseAndEqual(self._playbackData.config, 1)) then
+            strWanFa = "可吃，";
+		else
+			strWanFa = "不可吃，";
+		end
+		if (util.BitwiseAndEqual(self._playbackData.config, 2)) then
+            strWanFa = strWanFa.."可放炮";
+		else
+			strWanFa = strWanFa.."不可放炮";
+		end
+		ui.SetText(self._textWanFa, strWanFa);
+	end
+	local players = self._playbackData.players;
+	self._seat = 0;
+	for i = 1, 4 do
+		if (players[i].playerId == gm.PlayerID) then
+			self._seat = i - 1;
+			break;
+		end
+	end
+    self._banker = self._playbackData.banker;
+    local bankerSeat = self:Server2ClientSeat(self._playbackData.banker);
+	local clientSeat = 0;
+	for i = 1, 4 do
+		clientSeat = self:Server2ClientSeat(i - 1);
+		if (self._players[clientSeat] == nil) then
+			return;
+		end
+		self._players[clientSeat]:Show(true);
+		self._players[clientSeat]:SetPlayerId(players[i].playerId);
+		self._players[clientSeat]:SetGold(0);
+		self._players[clientSeat]:SetName(players[i].nickname);
+		self._players[clientSeat]:SetHeadImgUrl(players[i].headUrl);
+        self._players[clientSeat]:SetBanker(clientSeat == bankerSeat);
+	end
+    if (self._playback ~= nil) then
+		self._playback:SetRoom(self);
+		--将base64解码并解压缩
+		local json = CS.NiuMa.Utility.DecompressAndDeserializeBase64(self._playbackData.base64);
+		local data = rapidjson.decode(json);
+		local nicknames = {};
+		for i = 1, 4 do
+			local player = self._playbackData.players[i];
+			table.insert(nicknames, player.nickname);
+		end
+		self._playback:SetPlayback(data, nicknames);
+        self._playback:StartPlayback();
+	end
+end
+
+function _module:OnChatServer(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+		if (msg.type == 1) then
+			self._players[clientSeat]:SetChatEmoji(msg.index);
+		elseif (msg.type == 2) then
+			self._players[clientSeat]:SetChatPhrase(msg.index);
+            if (self._audioCtrl ~= nil) then
+                local sex = self._players[clientSeat]:GetSex();
+                self._audioCtrl:PlayPhrase(clientSeat, msg.index, (sex == 1));
+            end
+		elseif (msg.type == 3) then
+			self._players[clientSeat]:SetChatText(msg.text);
+		end
+	end
+end
+
+function _module:OnEffectServer(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	if (msg.index < 1 or msg.index > 4) then
+		return;
+	end
+    local clientSeat1 = self:Server2ClientSeat(msg.srcSeat);
+    local clientSeat2 = self:Server2ClientSeat(msg.dstSeat);
+    local prefabName = "";
+    local live = 1.0;
+    if (msg.index == 1) then
+        prefabName = "Prefabs/Game/Mahjong/Effects/Flower";
+        live = 1.25;
+    elseif (msg.index == 2) then
+        prefabName = "Prefabs/Game/Mahjong/Effects/Beer";
+        live = 1.0;
+    elseif (msg.index == 3) then
+        prefabName = "Prefabs/Game/Mahjong/Effects/Egg";
+        live = 1.25;
+    else
+        prefabName = "Prefabs/Game/Mahjong/Effects/Zan";
+        live = 1.3;
+    end
+	local rm = CS.NiuMa.ResourceManager.Instance;
+    local prefab = rm:LoadResource(prefabName, "prefabs/mahjong_effects.ab", "Assets/NiuMa/Resources/", ".prefab");
+    if (prefab == nil) then
+        return;
+    end
+    local prefabShip = rm:LoadResource("Prefabs/Game/Mahjong/Effects/EffectShip", "prefabs/mahjong_effects.ab", "Assets/NiuMa/Resources/", ".prefab");
+    if (prefabShip == nil) then
+        return;
+    end
+    local obj = CS.UnityEngine.GameObject.Instantiate(prefabShip, self._effectParent);
+    local effectShip = EffectShip.NewInstance();
+	effectShip.gameObject = obj;
+	effectShip:Awake();
+    effectShip:SetOwner(self);
+    effectShip:SetID(self._effectID);
+    effectShip:SetEffect(msg.index);
+	effectShip:SetFace(msg.index - 1);
+    effectShip:SetThrower(clientSeat1);
+    if (self._effects == nil) then
+        self._effects = {};
+    end
+    self._effects[self._effectID] = effectShip;
+    self._effectID = self._effectID + 1;
+    if (self._effectID > 100000) then
+        self._effectID = 1;
+    end
+    local startPoint = self._playerPositions[clientSeat1];
+    local endPoint = self._playerPositions[clientSeat2];
+    effectShip:ThrowEffect(startPoint, endPoint, prefab, live);
+end
+
+function _module:OnShipEffect(id, effect, thrower)
+    self._effects[id] = nil;
+    if (self._audioCtrl ~= nil) then
+        self._audioCtrl:PlayEffect(thrower, effect);
+    end
+end
+
+function _module:InitVoice()
+	local listener = self.gameObject:GetComponent("VoiceListener");
+	if (listener == nil) then
+		return;
+	end
+	listener:AddRecordCompletedHandler(self.OnRecordCompleted);
+	listener:AddPlayStartHandler(self.OnPlayStart);
+	listener:AddPlayStopHandler(self.OnPlayEnd);
+end
+
+function _module.OnRecordCompleted(fileName)
+	--语音录制完成
+	local nm = CS.NiuMa.NetworkManager.Instance;
+	local vm = CS.NiuMa.VoiceManager.Instance;
+	--发送语音消息
+	nm:SendVoiceMessage(fileName);
+	--将录制的mp3文件压入播放队列
+	vm:PushVoice(fileName, 1);
+end
+
+function _module.OnPlayStart(clientSeat)
+	local self = _module;
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:ShowChatTalk(true);
+	end
+end
+
+function _module.OnPlayEnd(clientSeat)
+	local self = _module;
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:ShowChatTalk(false);
+	end
+end
+
+function _module:OnPlayerVoice(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	CS.NiuMa.VoiceManager.Instance:PushVoice(msg.fileName, clientSeat);
+end
+
+function _module:OnDisbandVote(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	if (self._dlgDisband == nil) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    self._dlgDisband:Show(true);
+    local names = {};
+    local clientSeat = 0;
+    for i = 0, 3 do
+        clientSeat = self:Server2ClientSeat(i);
+        table.insert(names, self._players[clientSeat]:GetName());
+    end
+    self._dlgDisband:OnDisbandVote(msg, names, self._seat);
+end
+
+function _module:OnDisbandChoice(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	if (self._dlgDisband == nil) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    self._dlgDisband:OnDisbandChoice(msg.seat, self._seat, msg.choice);
+end
+
+function _module:OnDisbandObsolete()
+    if (self._dlgDisband ~= nil) then
+		self._dlgDisband:Show(false);
+	end
+end
+
+function _module:OnDisbandRoom()
+	CS.NiuMa.GameManager.Instance:ShowPromptDialog("房间已解散，请点击确定返回大厅。", _module.ExitRoom);
+end
+
+function _module.ExitRoom()
+	local gm = CS.NiuMa.GameManager.Instance;
+    gm:DestroyGameRoom();
+	gm:GetCapital();
+end
+
+return _module;

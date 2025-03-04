@@ -1,0 +1,204 @@
+-- 描述：百人牛牛玩家界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.19
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Head");
+    local child1 = nil;
+    if (child ~= nil) then
+        self._headTrans = child;
+        self._animator = child.gameObject:GetComponent("Animator");
+        child1 = child:Find("HeadTexture");
+        if (child1 ~= nil) then
+            self._headTexture = child1.gameObject;
+        end
+        child1 = child:Find("WinScore");
+        if (child1 ~= nil) then
+            self._winScore = child1.gameObject;
+            child1 = child1:Find("Text");
+            if (child1 ~= nil) then
+                self._textWinScore = child1.gameObject;
+            end
+        end
+        child1 = child:Find("LoseScore");
+        if (child1 ~= nil) then
+            self._loseScore = child1.gameObject;
+            child1 = child1:Find("Text");
+            if (child1 ~= nil) then
+                self._textLoseScore = child1.gameObject;
+            end
+        end
+    end
+    child = obj.transform:Find("Panel");
+    if (child ~= nil) then
+        child1 = child:Find("Gold/Text");
+        if (child1 ~= nil) then
+            self._textGold = child1.gameObject;
+        end
+        child1 = child:Find("TextName");
+        if (child1 ~= nil) then
+            self._textName = child1.gameObject;
+        end
+    end
+	self._playerId = nil;
+end
+
+function _module:Start()
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetPlayerId(playerId)
+    self._playerId = playerId;
+end
+
+function _module:GetPlayerId()
+    return self._playerId;
+end
+
+function _module:SetName(name)
+	self._name = name;
+	if (self._textName ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textName, name);
+	end
+end
+
+function _module:GetName()
+	return self._name;
+end
+
+function _module:SetGold(gold)
+	self._gold = gold;
+	if (self._textGold ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textGold, tostring(gold));
+	end
+end
+
+function _module:SetHeadTexture(tex)
+	self._texHead = tex;
+	if (self._headTexture ~= nil) then
+		CS.NiuMa.LuaUGUI.SetTexture(self._headTexture, tex);
+	end
+end
+
+function _module:GetHeadTexture()
+	return self._texHead;
+end
+
+function _module:SetHeadImgUrl(url)
+	if (url == nil or #url == 0) then
+		return;
+	end
+	local tex = CS.NiuMa.GameManager.Instance:GetTextureByUrl(url);
+	if (tex ~= nil) then
+		self:SetHeadTexture(tex);
+	else
+        local func = self:OnLoadHeadTexture(url);
+		CS.NiuMa.HttpRequester.Instance:GetTexture(url, func);
+	end
+end
+
+function _module:OnLoadHeadTexture(url)
+	local inst = self;
+	return function(tex)
+		local self = inst;
+		self:SetHeadTexture(tex);
+        CS.NiuMa.GameManager.Instance:AddTextureUrl(url, tex);
+	end
+end
+
+function _module:SetScore(score)
+    local obj = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (score < 0) then
+        if (self._loseScore ~= nil) then
+            obj = self._loseScore;
+            self._loseScore:SetActive(true);
+            if (self._textLoseScore ~= nil) then
+                ui.SetText(self._textLoseScore, tostring(score));
+            end
+        end
+    else
+        if (self._winScore ~= nil) then
+            obj = self._winScore;
+            self._winScore:SetActive(true);
+            if (self._textWinScore ~= nil) then
+                ui.SetText(self._textWinScore, tostring(score));
+            end
+        end
+    end
+    local Vector2 = CS.UnityEngine.Vector2;
+    if (obj ~= nil) then
+        local rectTrans = obj.transform;
+        rectTrans.anchoredPosition = Vector2(0.0, -50.0);
+        local doTween = CS.NiuMa.LuaDOTween;
+        local tweener = doTween.DOAnchorPos(obj, Vector2(0.0, 20.0), 2.0);
+        doTween.OnComplete(tweener, self:OnMoveScoreEnd());
+    end
+	if (score > 0) then
+		-- 显示赢金特效
+		if (self._prefabWinEffect == nil) then
+			local prefabName = "Prefabs/Common/WinEffect";
+			self._prefabWinEffect = CS.NiuMa.ResourceManager.Instance:LoadResource(prefabName, "prefabs/common.ab", "Assets/NiuMa/Resources/", ".prefab");
+		end
+		if (self._prefabWinEffect ~= nil) then
+            local GameObject = CS.UnityEngine.GameObject;
+			local obj = GameObject.Instantiate(self._prefabWinEffect, self._headTrans);
+            if (obj ~= nil) then
+				GameObject.Destroy(obj, 2.0);
+			end
+		end
+	end
+end
+
+function _module:OnMoveScoreEnd()
+    local inst = self;
+    return function()
+        local self = inst;
+        if (self._loseScore ~= nil) then
+            self._loseScore:SetActive(false);
+        end
+        if (self._winScore ~= nil) then
+            self._winScore:SetActive(false);
+        end
+    end
+end
+
+function _module:AddBet(amount)
+    local gold = self._gold - amount;
+    self:SetGold(gold);
+end
+
+function _module:ShakeHead()
+    if (self._animator ~= nil) then
+        self._animator:SetTrigger("Shake");
+    end
+end
+
+function _module:GetHeadPosition(rcTrans)
+    if (self._headPosition ~= nil) then
+        return self._headPosition;
+    end
+    if (self._headTrans ~= nil) then
+        self._headPosition = CS.NiuMa.LuaUGUI.WorldPointToLocalPointInRectangle(rcTrans, self._headTrans.position);
+    end
+    if (self._headPosition == nil) then
+        self._headPosition = Vector2(0.0, 0.0);
+    end
+    return self._headPosition;
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

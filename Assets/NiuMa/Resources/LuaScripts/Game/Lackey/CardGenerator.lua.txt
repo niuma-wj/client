@@ -1,0 +1,204 @@
+-- 描述：逮狗腿牌生成器脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.07
+
+local Poker = require 'Common.Poker';
+local pok_def = require 'Common.PokerDefines';
+
+local _module = {};
+
+_module._pokerPrefabs = {};
+
+_module._point2Orders = {};
+_module._point2Orders[pok_def.PokerPoint.Three] = 1;
+_module._point2Orders[pok_def.PokerPoint.Four] = 2;
+_module._point2Orders[pok_def.PokerPoint.Five] = 3;
+_module._point2Orders[pok_def.PokerPoint.Six] = 4;
+_module._point2Orders[pok_def.PokerPoint.Seven] = 5;
+_module._point2Orders[pok_def.PokerPoint.Eight] = 6;
+_module._point2Orders[pok_def.PokerPoint.Nine] = 7;
+_module._point2Orders[pok_def.PokerPoint.Ten] = 8;
+_module._point2Orders[pok_def.PokerPoint.Jack] = 9;
+_module._point2Orders[pok_def.PokerPoint.Queen] = 10;
+_module._point2Orders[pok_def.PokerPoint.King] = 11;
+_module._point2Orders[pok_def.PokerPoint.Ace] = 12;
+_module._point2Orders[pok_def.PokerPoint.Two] = 13;
+_module._point2Orders[pok_def.PokerPoint.Joker] = 14;
+
+_module._order2Points = {};
+_module._order2Points[1] = pok_def.PokerPoint.Three;
+_module._order2Points[2] = pok_def.PokerPoint.Four;
+_module._order2Points[3] = pok_def.PokerPoint.Five;
+_module._order2Points[4] = pok_def.PokerPoint.Six;
+_module._order2Points[5] = pok_def.PokerPoint.Seven;
+_module._order2Points[6] = pok_def.PokerPoint.Eight;
+_module._order2Points[7] = pok_def.PokerPoint.Nine;
+_module._order2Points[8] = pok_def.PokerPoint.Ten;
+_module._order2Points[9] = pok_def.PokerPoint.Jack;
+_module._order2Points[10] = pok_def.PokerPoint.Queen;
+_module._order2Points[11] = pok_def.PokerPoint.King;
+_module._order2Points[12] = pok_def.PokerPoint.Ace;
+_module._order2Points[13] = pok_def.PokerPoint.Two;
+_module._order2Points[14] = pok_def.PokerPoint.Joker;
+
+
+function _module.PokerPrefab(point, suit)
+    local prefabName = "";
+    if (point == pok_def.PokerPoint.Ace) then
+        prefabName = "Ace";
+    elseif (point == pok_def.PokerPoint.Two) then
+        prefabName = "Two";
+    elseif (point == pok_def.PokerPoint.Three) then
+        prefabName = "Three";
+    elseif (point == pok_def.PokerPoint.Four) then
+        prefabName = "Four";
+    elseif (point == pok_def.PokerPoint.Five) then
+        prefabName = "Five";
+    elseif (point == pok_def.PokerPoint.Six) then
+        prefabName = "Six";
+    elseif (point == pok_def.PokerPoint.Seven) then
+        prefabName = "Seven";
+    elseif (point == pok_def.PokerPoint.Eight) then
+        prefabName = "Eight";
+    elseif (point == pok_def.PokerPoint.Nine) then
+        prefabName = "Nine";
+    elseif (point == pok_def.PokerPoint.Ten) then
+        prefabName = "Ten";
+    elseif (point == pok_def.PokerPoint.Jack) then
+        prefabName = "Jack";
+    elseif (point == pok_def.PokerPoint.Queen) then
+        prefabName = "Queen";
+    elseif (point == pok_def.PokerPoint.King) then
+        prefabName = "King";
+    elseif (point == pok_def.PokerPoint.Joker) then
+        prefabName = "Joker";
+    else
+        return "";
+    end
+    if (suit == pok_def.PokerSuit.Diamond) then
+        prefabName = prefabName .. "1";
+    elseif (suit == pok_def.PokerSuit.Club) then
+        prefabName = prefabName .. "2";
+    elseif (suit == pok_def.PokerSuit.Heart) then
+        prefabName = prefabName .. "3";
+    elseif (suit == pok_def.PokerSuit.Spade) then
+        prefabName = prefabName .. "4";
+    elseif (suit == pok_def.PokerSuit.Little) then
+        prefabName = prefabName .. "1";
+    elseif (suit == pok_def.PokerSuit.Big) then
+        prefabName = prefabName .. "2";
+    else
+        return "";
+    end
+    return prefabName;
+end
+
+function _module.GetPokerPrefab(point, suit, small)
+    local path = "";
+    if (small) then
+        path = "Prefabs/Game/Lackey/Cards/Small/";
+    else
+        path = "Prefabs/Game/Lackey/Cards/Big/";
+    end
+    local prefabName = path .. _module.PokerPrefab(point, suit);
+    local prefab = _module._pokerPrefabs[prefabName];
+    if (prefab == nil) then
+        prefab = CS.NiuMa.ResourceManager.Instance:LoadResource(prefabName, "prefabs/lackey_cards.ab", "Assets/NiuMa/Resources/", ".prefab");
+        if (prefab ~= nil) then
+            _module._pokerPrefabs[prefabName] = prefab;
+        end
+    end
+    return prefab;
+end
+
+function _module.CreateCard(point, suit, small, parent, pos)
+    if (parent == nil) then
+        return;
+    end
+    local prefab = _module.GetPokerPrefab(point, suit, small);
+    if (prefab == nil) then
+        return;
+    end
+    local obj = CS.UnityEngine.GameObject.Instantiate(prefab, parent);
+    if (obj ~= nil and pos ~= nil) then
+        obj.transform.anchoredPosition = pos;
+    end
+    return obj;
+end
+
+function _module.CreateLackeyMask(_12, small, parent)
+    if (parent == nil) then
+        return;
+    end
+    local path = "";
+    local prefabName = "";
+    if (small) then
+        path = "Prefabs/Game/Lackey/Cards/Small/";
+    else
+        path = "Prefabs/Game/Lackey/Cards/Big/";
+    end
+    if (_12) then
+        prefabName = path .. "LackeyMask1";
+    else
+        prefabName = path .. "LackeyMask2";
+    end
+    local prefab = CS.NiuMa.ResourceManager.Instance:LoadResource(prefabName, "prefabs/lackey_cards.ab", "Assets/NiuMa/Resources/", ".prefab");
+    if (prefab ~= nil) then
+        CS.UnityEngine.GameObject.Instantiate(prefab, parent);
+    end
+end
+
+function _module.SortCardIds(cards)
+    if (cards == nil) then
+        return;
+    end
+    local nums1 = #cards;
+    if (nums1 == nil) then
+        return;
+    end
+    local nums2 = 0;
+	local order = 0;
+    local pointNums = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    local sortedIds = {};
+    for i = 1, nums1 do
+        local card = cards[i];
+		order = _module._point2Orders[card.point];
+		pointNums[order] = pointNums[order] + 1;
+    end
+    local test = false;
+    local orders = {};
+    for i = 1, 14 do
+		if (pointNums[i] > 0) then
+			test = false;
+			nums2 = #orders;
+			for j = 1, nums2 do
+				if (pointNums[i] >= pointNums[orders[j]]) then
+					table.insert(orders, j, i);
+					test = true;
+					break;
+				end
+			end
+			if (not test) then
+				table.insert(orders, i);
+			end
+		end
+    end
+    nums2 = #orders;
+    for i = 1, nums2 do
+        test = false;
+        for j = nums1, 1, -1 do
+            local card = cards[j];
+			order = _module._point2Orders[card.point];
+            if (order == orders[i]) then
+                test = true;
+                table.insert(sortedIds, card.id);
+            elseif (test) then
+                break;
+            end
+        end
+    end
+    return sortedIds;
+end
+
+return _module;

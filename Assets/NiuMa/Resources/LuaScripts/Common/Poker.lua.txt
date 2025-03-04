@@ -1,0 +1,84 @@
+-- 描述：扑克实用工具脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.28
+
+local poker_def = require 'Common.PokerDefines';
+
+local _module = {};
+
+function _module.FromInt32(card)
+    local util = CS.NiuMa.Utility;
+	local suit = util.BitwiseAnd(card, 255);
+	local point = util.BitwiseAnd(card, 65280);
+	point = util.ShiftRight(point, 8);
+	return point, suit;
+end
+
+function _module.FromInt32Ex(card)
+    local point, suit = _module.FromInt32(card);
+	local c = {};
+	c.point = point;
+	c.suit = suit;
+	return c;
+end
+
+function _module.ToInt32(point, suit)
+    local util = CS.NiuMa.Utility;
+	local val = util.ShiftLeft(point, 8);
+	val = util.BitwiseOr(val, suit);
+	return val;
+end
+
+function _module.PokerPrefab(point, suit)
+    local prefabName = "";
+    if (point == poker_def.PokerPoint.Ace) then
+        prefabName = "Prefabs/Common/Pokers/Ace";
+    elseif (point == poker_def.PokerPoint.Two) then
+        prefabName = "Prefabs/Common/Pokers/Two";
+    elseif (point == poker_def.PokerPoint.Three) then
+        prefabName = "Prefabs/Common/Pokers/Three";
+    elseif (point == poker_def.PokerPoint.Four) then
+        prefabName = "Prefabs/Common/Pokers/Four";
+    elseif (point == poker_def.PokerPoint.Five) then
+        prefabName = "Prefabs/Common/Pokers/Five";
+    elseif (point == poker_def.PokerPoint.Six) then
+        prefabName = "Prefabs/Common/Pokers/Six";
+    elseif (point == poker_def.PokerPoint.Seven) then
+        prefabName = "Prefabs/Common/Pokers/Seven";
+    elseif (point == poker_def.PokerPoint.Eight) then
+        prefabName = "Prefabs/Common/Pokers/Eight";
+    elseif (point == poker_def.PokerPoint.Nine) then
+        prefabName = "Prefabs/Common/Pokers/Nine";
+    elseif (point == poker_def.PokerPoint.Ten) then
+        prefabName = "Prefabs/Common/Pokers/Ten";
+    elseif (point == poker_def.PokerPoint.Jack) then
+        prefabName = "Prefabs/Common/Pokers/Jack";
+    elseif (point == poker_def.PokerPoint.Queen) then
+        prefabName = "Prefabs/Common/Pokers/Queen";
+    elseif (point == poker_def.PokerPoint.King) then
+        prefabName = "Prefabs/Common/Pokers/King";
+    elseif (point == poker_def.PokerPoint.Joker) then
+        prefabName = "Prefabs/Common/Pokers/Joker";
+    else
+        return "";
+    end
+    if (suit == poker_def.PokerSuit.Diamond) then
+        prefabName = prefabName .. "1";
+    elseif (suit == poker_def.PokerSuit.Club) then
+        prefabName = prefabName .. "2";
+    elseif (suit == poker_def.PokerSuit.Heart) then
+        prefabName = prefabName .. "3";
+    elseif (suit == poker_def.PokerSuit.Spade) then
+        prefabName = prefabName .. "4";
+    elseif (suit == poker_def.PokerSuit.Little) then
+        prefabName = prefabName .. "1";
+    elseif (suit == poker_def.PokerSuit.Big) then
+        prefabName = prefabName .. "2";
+    else
+        return "";
+    end
+    return prefabName;
+end
+
+return _module;

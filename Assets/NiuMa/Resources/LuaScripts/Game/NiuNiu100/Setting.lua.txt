@@ -1,0 +1,27 @@
+-- 描述：百人牛牛设置对话框脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.19
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child = obj.transform:Find("Frame/BtnClose");
+    if (child ~= nil) then
+        CS.NiuMa.LuaUGUI.AddBtnClick(child.gameObject, self.OnCloseClick);
+	end
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+    self:Show(false);
+end
+
+return _module;

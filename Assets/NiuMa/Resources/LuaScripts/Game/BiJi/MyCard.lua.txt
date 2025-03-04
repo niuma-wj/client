@@ -1,0 +1,96 @@
+-- 描述：比鸡本玩家手牌逻辑脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.28
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Start()
+    self._callback = self:OnMoveComplete();
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetRoom(r)
+    self._room = r;
+end
+
+function _module:GetTransform()
+    return self.gameObject.transform;
+end
+
+function _module:GetCallback()
+    return self._callback;
+end
+
+function _module:SetCardObject(obj)
+    self._cardObj = obj;
+end
+
+function _module:SetDunCard(card)
+    self._dunCard = card;
+end
+
+function _module:SetFinalCard(s)
+    self._finalCard = s;
+end
+
+function _module:ShipCard(position, scale)
+	local trans = self.gameObject:GetComponent("RectTransform");
+	if (scale ~= nil) then
+		self._twScale = CS.NiuMa.LuaDOTween.DOScale(self.gameObject, scale, 0.3);
+	end
+	local doTween = CS.NiuMa.LuaDOTween;
+	self._twMove = doTween.DOAnchorPos(self.gameObject, position, 0.3);
+	doTween.SetEase(self._twMove, CS.DG.Tweening.Ease.OutCubic);
+	doTween.OnComplete(self._twMove, self._callback);
+	self._animating = true;
+end
+
+function _module:StopShipCard()
+	if (not self._animating) then
+		return;
+	end
+	local doTween = CS.NiuMa.LuaDOTween;
+	if (self._twScale ~= nil) then
+		doTween.Kill(self._twScale);
+		self._twScale = nil;
+	end
+	if (self._twMove ~= nil) then
+		doTween.Kill(self._twMove);
+		self._twMove = nil;
+	end
+	self._animating = false;
+end
+
+function _module:OnMoveComplete()
+	local inst = self;
+	return function()
+		local self = inst;
+		if (self._cardObj ~= nil and self._dunCard ~= nil) then
+			local trans1 = self._cardObj.transform;
+			local trans2 = self._dunCard:GetTransform();
+			trans1:SetParent(trans2, false);
+			self._cardObj = nil;
+			self._dunCard = nil;
+		end
+		if (self._finalCard and self._room ~= nil) then
+			self._finalCard = false;
+			self._room:OnShipCardComplete();
+		end
+		self._animating = false;
+		self._twScale = nil;
+		self._twMove = nil;
+	end
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

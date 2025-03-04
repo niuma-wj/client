@@ -1,0 +1,312 @@
+-- 描述：比鸡玩家界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.28
+
+local base = require 'BehaviourBase';
+local ChatText = require 'Game.BiJi.ChatText';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("HeadTexture");
+    if (child ~= nil) then
+        self._headTexture = child.gameObject;
+    end
+    child = obj.transform:Find("TextName");
+    if (child ~= nil) then
+        self._textName = child.gameObject;
+    end
+    child = obj.transform:Find("TextGold");
+    if (child ~= nil) then
+        self._textGold = child.gameObject;
+    end
+    child = obj.transform:Find("Ready");
+    if (child ~= nil) then
+        self._ready = child.gameObject;
+    end
+    child = obj.transform:Find("Offline");
+    if (child ~= nil) then
+        self._offline = child.gameObject;
+    end
+    child = obj.transform:Find("Owner");
+    if (child ~= nil) then
+        self._owner = child.gameObject;
+    end
+	child = obj.transform:Find("Wait");
+    if (child ~= nil) then
+        self._wait = child.gameObject;
+    end
+	child = obj.transform:Find("ChatText");
+	if (child ~= nil) then
+		self._chatText = ChatText.NewInstance();
+		self._chatText.gameObject = child.gameObject;
+		self._chatText:Awake();
+	end
+	child = obj.transform:Find("ChatEmoji");
+	if (child ~= nil) then
+		self._chatEmoji = child.gameObject;
+	end
+	child = obj.transform:Find("ChatTalk");
+	if (child ~= nil) then
+		self._chatTalk = child.gameObject;
+	end
+	self._playerId = 0;
+	self._joinRound = false;
+end
+
+function _module:Start()
+end
+
+function _module:Update()
+	self:UpdateChat();
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetPlayerId(id)
+    self._playerId = id;
+
+	if (id == 0) then
+		self:SetOwner(false);
+		self:SetJoinRound(false);
+	end
+end
+
+function _module:GetPlayerId()
+    return self._playerId;
+end
+
+function _module:SetSex(sex)
+	self._sex = sex;
+end
+
+function _module:GetSex()
+	return self._sex;
+end
+
+function _module:SetName(name)
+	self._name = name;
+	if (self._textName ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textName, name);
+	end
+end
+
+function _module:GetName()
+	return self._name;
+end
+
+function _module:SetGold(gold)
+	self._gold = gold;
+	if (self._textGold ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textGold, tostring(gold));
+	end
+end
+
+function _module:AddGold(gold)
+	self._gold = self._gold + gold;
+	if (self._textGold ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textGold, String.Format("{0:0.##}", self._gold));
+	end
+end
+
+function _module:SetHeadTexture(tex)
+	self._texHead = tex;
+	if (self._headTexture ~= nil) then
+		CS.NiuMa.LuaUGUI.SetTexture(self._headTexture, tex);
+	end
+end
+
+function _module:GetHeadTexture()
+	return self._texHead;
+end
+
+function _module:SetHeadImgUrl(url)
+	if (url == nil or #url == 0) then
+		return;
+	end
+	local tex = CS.NiuMa.GameManager.Instance:GetTextureByUrl(url);
+	if (tex ~= nil) then
+		self:SetHeadTexture(tex);
+	else
+		local func = self:OnLoadHeadTexture();
+		CS.NiuMa.HttpRequester.Instance:GetTexture(url, func);
+	end
+end
+
+function _module:OnLoadHeadTexture()
+	--以函数闭包的方式保存当前self实例，注意此时self并不等于_module
+	local inst = self;
+	return function(tex)
+		local self = inst;
+		self:SetHeadTexture(tex);
+	end
+end
+
+function _module:SetReady(s)
+    if (self._ready ~= nil) then
+        self._ready:SetActive(s);
+    end
+end
+
+function _module:SetOffline(s)
+    if (self._offline ~= nil) then
+        self._offline:SetActive(s);
+    end
+end
+
+function _module:SetOwner(s)
+    if (self._owner ~= nil) then
+        self._owner:SetActive(s);
+    end
+end
+
+function _module:SetJoinRound(s)
+	self._joinRound = s;
+	if (self._wait ~= nil) then
+        self._wait:SetActive(not s);
+    end
+end
+
+function _module:IsJoinRound()
+	return self._joinRound;
+end
+
+function _module:Clear()
+	self:SetPlayerId(nil);
+	self:SetName("");
+	if (self._textGold ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textGold, "");
+	end
+	self:SetOffline(false);
+	self:SetHeadTexture(nil);
+	self:SetReady(false);
+	self:SetOwner(false);
+    if (self._chatText ~= nil) then
+		self._chatText:Show(false);
+	end
+	if (self._chatEmoji ~= nil) then
+        self._chatEmoji:SetActive(false);
+	end
+	if (self._chatTalk ~= nil) then
+		self._chatTalk:SetActive(false);
+	end
+	self._chating = false;
+	self:Show(false);
+end
+
+function _module:SetChatEmoji(idx)
+	if (idx < 1 or idx > 27) then
+		return;
+	end
+	if (self._emojiObj ~= nil) then
+        CS.UnityEngine.GameObject.Destroy(self._emojiObj);
+        self._emojiObj = nil;
+	end
+	if (self._chatText ~= nil) then
+        self._chatText:Show(false);
+	end
+    if (self._chatEmoji == nil) then
+        return;
+	end
+	local prefab = nil;
+	if (self._emojiPrefabs ~= nil) then
+		prefab = self._emojiPrefabs[idx];
+	end
+	if (prefab == nil) then
+		local name = string.format("Prefabs/Common/Emojis/Emoji%02d", idx);
+		prefab = CS.NiuMa.ResourceManager.Instance:LoadResource(name, "prefabs/emojis.ab", "Assets/NiuMa/Resources/", ".prefab");
+		if (prefab == nil) then
+			return;
+		end
+		if (self._emojiPrefabs == nil) then
+			self._emojiPrefabs = {};
+		end
+		self._emojiPrefabs[idx] = prefab;
+	end
+	self._chatEmoji:SetActive(true);
+    self._emojiObj = CS.UnityEngine.GameObject.Instantiate(prefab, self._chatEmoji.transform);
+    if (self._emojiObj ~= nil) then
+        self._chating = true;
+        self._chatElapsed = 0.0;
+    else
+        self._chatEmoji:SetActive(false);
+	end
+end
+
+_module.Phrases =
+{
+	"快点儿吧，等到花儿都谢了",
+	"你的牌打得太好啦",
+	"整个一个悲剧啊",
+	"一手烂牌臭到底",
+	"你家里是开银行的吧",
+	"不要吵啦，专心玩牌吧",
+	"大清早，鸡都还没叫慌什么",
+	"再见了，我会想念大家的",
+	"别墨迹，快点出牌"
+};
+
+function _module:SetChatPhrase(idx)
+    if (idx < 1 or idx > 9) then
+        return;
+	end
+    self:SetChatText(self.Phrases[idx]);
+end
+
+function _module:SetChatText(text)
+    if (text == nil or #text == 0) then
+        return;
+	end
+    if (self._emojiObj ~= nil) then
+        CS.UnityEngine.GameObject.Destroy(self._emojiObj);
+        self._emojiObj = nil;
+    end
+    if (self._chatEmoji ~= nil) then
+        self._chatEmoji:SetActive(false);
+	end
+    if (self._chatText ~= nil) then
+		self._chatText:Show(true);
+        self._chatText:SetChatText(text);
+	end
+    self._chating = true;
+    self._chatElapsed = 0.0;
+end
+
+function _module:UpdateChat()
+    if (not self._chating) then
+        return;
+	end
+    self._chatElapsed = self._chatElapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+    if (self._chatElapsed > 5.0) then
+        self._chating = false;
+        if (self._chatText ~= nil) then
+            self._chatText:Show(false);
+		end
+        if (self._emojiObj ~= nil) then
+            CS.UnityEngine.GameObject.Destroy(self._emojiObj);
+            self._emojiObj = nil;
+        end
+        if (self._chatEmoji ~= nil) then
+            self._chatEmoji:SetActive(false);
+		end
+	elseif (self._chatText ~= nil and self._chatText.gameObject.activeSelf) then
+		self._chatText:Update();
+    end
+end
+
+function _module:ShowChatTalk(show)
+	if (self._chatTalk ~= nil) then
+		self._chatTalk:SetActive(show);
+	end
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

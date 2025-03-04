@@ -1,0 +1,224 @@
+local base = require 'BehaviourBase';
+local ZhanJiRound = require 'Game.Mahjong.ZhanJiRound';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Frame");
+    local ui = CS.NiuMa.LuaUGUI;
+    self._rounds = {};
+    if (child ~= nil) then
+        local child1 = child:Find("BtnClose");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnCloseClick);
+        end
+        child1 = child:Find("Page/TextPage");
+        if (child1 ~= nil) then
+            self._textPage = child1.gameObject;
+        end
+        child1 = child:Find("PagePrev");
+        if (child1 ~= nil) then
+            self._pagePrev = child1.gameObject;
+        end
+        child1 = child:Find("PageNext");
+        if (child1 ~= nil) then
+            self._pageNext = child1.gameObject;
+        end
+        child1 = child:Find("BtnPagePrev");
+        if (child1 ~= nil) then
+            self._btnPagePrev = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnPagePrevClick);
+        end
+        child1 = child:Find("BtnPageNext");
+        if (child1 ~= nil) then
+            self._btnPageNext = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnPageNextClick);
+        end
+        for i = 1, 4 do
+            child1 = child:Find("PageRound/Round0"..i);
+            if (child1 ~= nil) then
+                self._rounds[i] = ZhanJiRound.NewInstance();
+                self._rounds[i].gameObject = child1.gameObject;
+                self._rounds[i]:Awake();
+            end
+        end
+    end
+    --当前页
+    self._page = 1;
+    --总页数
+    self._totalPage = 0;
+    self._requesting = false;
+    self._headTextures = {};
+end
+
+function _module:Start()
+    for i = 1, 4 do
+        if (self._rounds[i] ~= nil) then
+            self._rounds[i]:SetDlgZhanJi(self);
+            self._rounds[i]:Start();
+        end
+    end
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:OnShowDialog()
+    if (self._page == 1) then
+        self:RequestPage(1);
+    end
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+    self:Show(false);
+end
+
+function _module.OnPagePrevClick()
+    local self = _module;
+    if (self._page <= 1) then
+        --当前已经是第一页，不能再请求上一页
+        return;
+    end
+    self:RequestPage(self._page - 1);
+end
+
+function _module.OnPageNextClick()
+    local self = _module;
+    if (self._page >= self._totalPage) then
+        -- 当前已是最后一页不能再请求下一页
+        return;
+    end
+    self:RequestPage(self._page + 1);
+end
+
+function _module:UpdatePageText()
+    if (self._btnPagePrev ~= nil) then
+        self._btnPagePrev:SetActive(self._page > 1);
+    end
+    if (self._pagePrev ~= nil) then
+        self._pagePrev:SetActive(self._page < 2);
+    end
+    if (self._btnPageNext ~= nil) then
+        self._btnPageNext:SetActive(self._page < self._totalPage);
+    end
+    if (self._pageNext ~= nil) then
+        self._pageNext:SetActive(self._page > (self._totalPage - 1));
+    end
+    local text = "";
+    if (self._totalPage > 0) then
+        text = tostring(self._page) .. "/" .. tostring(self._totalPage);
+    end
+    if (self._textPage ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textPage, text);
+    end
+end
+
+-- 请求页面
+function _module:RequestPage(page)
+    if (self._requesting) then
+        -- 当前正在请求数据，但是数据还没有返回，直接退出
+        return;
+    end
+    local t = {};
+    t.pageNum = page;
+    t.pageSize = 4;
+    local body = rapidjson.encode(t);
+    local gm = CS.NiuMa.GameManager.Instance;
+    gm:AuthPost("/player/game/mahjong/record", body, self.OnGetMahjongRecord);
+    self._requesting = true;
+end
+
+function _module:IsRequesting()
+    return self._requesting;
+end
+
+function _module:SetRequesting(s)
+    self._requesting = s;
+end
+
+function _module.OnGetMahjongRecord(code, text) 
+    local self = _module;
+    self._requesting = false;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code == 200) then
+        self._page = t.pageNum;
+        self._totalPage = math.ceil(t.total / 4);
+        self:UpdatePageText();
+        local nums = 0;
+        if (t.records ~= nil and t.records ~= rapidjson.null) then
+            nums = #(t.records);
+        end
+        for i = 1, nums do
+            if (self._rounds[i] ~= nil) then
+                local record = t.records[i];
+                self._rounds[i]:Show(true);
+                self._rounds[i]:SetRecord(record);
+            end
+        end
+        for i = nums + 1, 4 do
+            if (self._rounds[i] ~= nil) then
+                self._rounds[i]:Show(false);
+            end
+        end
+    else
+        local msg = t.msg;
+        if (msg == nil or #msg == 0) then
+            msg = text;
+        end
+        msg = "请求游戏记录失败：" .. msg;
+        gm:ShowPromptTip(msg, 2.0);
+    end
+end
+
+function _module.OnGetPlayback(code, text)
+    local self = _module;
+    self._requesting = false;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+	if (code == 200) then
+        --判断当前是否已经进入回放，若是则不再进入
+	    local room = gm:GetGameRoom();
+	    if (room ~= nil) then
+		    return;
+	    end
+        --设置全局变量
+        mahjongPlaybackData = t.data;
+        local prefab = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/Mahjong/Room", "prefabs/mahjong_main.ab", "Assets/NiuMa/Resources/", ".prefab");
+	    if (prefab ~= nil) then
+		    gm:CreateHallRoom("Mahjong-Room", prefab, false);
+	    end
+	else
+        local msg = t.msg;
+        if (msg == nil or #msg == 0) then
+            msg = text;
+        end
+        msg = "请求游戏回放数据失败：" .. msg;
+        gm:ShowPromptTip(msg, 2.0);
+	end
+	
+end
+
+function _module:ClearRounds()
+    for i = 1, 4 do
+        if (self._rounds[i] ~= nil) then
+            self._rounds[i]:Show(false);
+        end
+    end
+end
+
+function _module:GetHeadTextureByUrl(url)
+    local tex = self._headTextures[url];
+    return tex;
+end
+
+function _module:AddHeadTexture(url, tex)
+    self._headTextures[url] = tex;
+end
+
+return _module;

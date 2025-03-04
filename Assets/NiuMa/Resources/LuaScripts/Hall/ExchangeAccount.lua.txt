@@ -1,0 +1,107 @@
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("Dialog");
+    local child1 = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+        child1 = child:Find("InputPassword");
+        if (child1 ~= nil) then
+            self._inputPassword = child1.gameObject;
+        end
+        child1 = child:Find("Account");
+        if (child1 ~= nil) then
+            self._textType = child1.gameObject;
+        end
+        child1 = child:Find("InputAccount");
+        if (child1 ~= nil) then
+            self._inputAccount = child1.gameObject;
+        end
+        child1 = child:Find("InputName");
+        if (child1 ~= nil) then
+            self._inputName = child1.gameObject;
+        end
+        child1 = child:Find("BtnOk");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnOkClick);
+        end
+        child1 = child:Find("BtnCancel");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnCancelClick);
+        end
+    end
+    self._type = 0;
+end
+
+function _module:SetOwner(owner)
+    self._owner = owner;
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:Clear()
+    if (self._inputPassword ~= nil) then
+        CS.NiuMa.LuaUGUI.SetInputText(self._inputPassword, "");
+    end
+end
+
+function _module:SetType(t)
+    self._type = t;
+    if (self._textType ~= nil) then
+        if (t == 0) then
+            CS.NiuMa.LuaUGUI.SetText(self._textType, "支付宝账号:");
+        else
+            CS.NiuMa.LuaUGUI.SetText(self._textType, "银行账号:");
+        end
+    end
+end
+
+function _module.OnOkClick()
+    local self = _module;
+    if (self._owner == nil) then
+        return;
+    end
+    local pwd = "";
+    local account = "";
+    local name = "";
+    local ui = CS.NiuMa.LuaUGUI;
+    local gm = CS.NiuMa.GameManager.Instance;
+    if (self._inputPassword ~= nil) then
+        pwd = ui.GetInputText(self._inputPassword);
+    end
+    if (self._inputAccount ~= nil) then
+        account = ui.GetInputText(self._inputAccount);
+    end
+    if (self._inputName ~= nil) then
+        name = ui.GetInputText(self._inputName);
+    end
+    local t = {};
+    if (pwd ~= nil and #pwd > 0) then
+        pwd = CS.NiuMa.AesUtil.Encrypt(pwd);
+        t.password = pwd;
+    end
+    if (account == nil or #account == 0) then
+        gm:ShowPromptTip("请输入账号", 2.0);
+        return;
+    end
+    -- 发送绑定账号HTTP请求
+    t.account = account;
+    t.name = name;
+    t.type = self._type;
+    local body = rapidjson.encode(t);
+    gm:AuthPost("/player/capital/bind/account", body, self._owner.OnBindAccountRespone);
+    self:Show(false);
+end
+
+function _module.OnCancelClick()
+    local self = _module;
+    self:Show(false);
+end
+
+return _module;

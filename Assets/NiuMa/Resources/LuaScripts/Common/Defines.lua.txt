@@ -1,0 +1,105 @@
+-- 描述：公共定义模块
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.10
+
+local _module = {};
+
+-- 服务器类型
+_module.ServerType = {};
+_module.ServerType.LoginServer = 0;		-- 登录服
+_module.ServerType.CenterServer = 1;	-- 中心服
+_module.ServerType.HallServer = 2;		-- 大厅服
+_module.ServerType.TableServer = 3;		-- 牌桌服
+
+_module.GameType = {};
+_module.GameType.Invalid = 0;			-- 无效游戏
+_module.GameType.Dumb = 1;				-- 空游戏
+_module.GameType.Mahjong = 1021;		-- 麻将
+_module.GameType.DouDiZhu = 1022;		-- 斗地主
+_module.GameType.NiuNiu100 = 1023;		-- 百人牛牛
+_module.GameType.NiuNiu = 1024;			-- 经典牛牛
+_module.GameType.RedBlack = 1025;		-- 红黑大战
+_module.GameType.ZhaJinHua = 1026;		-- 炸金花
+_module.GameType.LiuAnBiJi = 1027;		-- 六安比鸡
+_module.GameType.Lackey = 1028;			-- 逮狗腿
+
+_module.StageState = {};
+_module.StageState.NotStarted = 0;
+_module.StageState.Underway = 1;
+_module.StageState.Finished = 2;
+
+_module.CreateTableResult = {};
+_module.CreateTableResult.Unknown = 0;			-- 未知错误
+_module.CreateTableResult.Succeed = 1;			-- 创建成功
+_module.CreateTableResult.Insufficient = 2;		-- 金币(房卡)不足
+_module.CreateTableResult.AboveLimit = 3;		-- 当前创建的房间数量已达上限
+_module.CreateTableResult.Conflict = 4;			-- 当前正在创建(或加入)其他牌桌
+_module.CreateTableResult.Locked = 5;			-- 用户当前被其他牌桌锁住
+_module.CreateTableResult.PasswordError = 6;	-- 银行密码错误
+
+_module.JoinTableResult = {};
+_module.JoinTableResult.Unknown = 0;		-- 未知错误
+_module.JoinTableResult.Succeed = 1;		-- 加入成功
+_module.JoinTableResult.NotFound = 2;		-- 找不到指定房间
+_module.JoinTableResult.Insufficient = 3;	-- 金币(房卡)不足
+_module.JoinTableResult.Conflict = 4;		-- 当前正在创建(或加入)其他牌桌，无法加入
+_module.JoinTableResult.Locked = 5;			-- 用户当前被其他牌桌锁住，无法加入
+_module.JoinTableResult.Full = 6;			-- 牌桌人已满
+_module.JoinTableResult.Occupied = 7;		-- 指定座位已经被占(仅对指定座位的情况有效)
+_module.JoinTableResult.Obsolete = 8;		-- 房间已废弃
+
+function _module:GameInnerNameFromType(tableType)
+	local name = "Unkwown";
+	if (tableType == self.TableType.Mahjong) then
+		name = "Mahjong";
+	elseif (tableType == self.TableType.DouDiZhu) then
+		name = "DouDiZhu";
+	elseif (tableType == self.TableType.NiuNiu100) then
+		name = "NiuNiu100";
+	elseif (tableType == self.TableType.NiuNiu) then
+		name = "NiuNiu";
+	elseif (tableType == self.TableType.RedBlack) then
+		name = "RedBlack";
+	elseif (tableType == self.TableType.ZhaJinHua) then
+		name = "ZhaJinHua";
+	elseif (tableType == self.TableType.LiuAnBiJi) then
+		name = "BiJi";
+	elseif (tableType == self.TableType.Lackey) then
+		name = "Lackey";
+	end
+	return name;
+end
+
+function _module:GameNameFromType(tableType)
+	local name = "";
+	if (tableType == self.TableType.Mahjong) then
+		name = "标准麻将";
+	elseif (tableType == self.TableType.DouDiZhu) then
+		name = "斗地主";
+	elseif (tableType == self.TableType.NiuNiu100) then
+		name = "百人牛牛";
+	elseif (tableType == self.TableType.NiuNiu) then
+		name = "经典牛牛";
+	elseif (tableType == self.TableType.RedBlack) then
+		name = "红黑大战";
+	elseif (tableType == self.TableType.ZhaJinHua) then
+		name = "炸金花";
+	elseif (tableType == self.TableType.LiuAnBiJi) then
+		name = "六安比鸡";
+	elseif (tableType == self.TableType.Lackey) then
+		name = "逮狗腿";
+	else
+		name = "未知";
+	end
+	return name;
+end
+
+_module.DistrictId = {};
+_module.DistrictId.Invalid = 0;			-- 无效游戏场
+_module.DistrictId.LackeyBeginner = 1;	-- 逮狗腿新手房
+_module.DistrictId.LackeyModerate = 2;	-- 逮狗腿初级房
+_module.DistrictId.LackeyAdvanced = 3;	-- 逮狗腿高级房
+_module.DistrictId.LackeyMaster = 4;	-- 逮狗腿顶级房
+
+return _module;

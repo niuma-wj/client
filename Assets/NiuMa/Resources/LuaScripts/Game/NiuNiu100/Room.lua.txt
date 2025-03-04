@@ -1,0 +1,1394 @@
+-- 描述：百人牛牛游戏逻辑脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.19
+
+local base = require 'BehaviourBase';
+local AudioControl = require 'Game.NiuNiu100.AudioControl';
+local Player = require 'Game.NiuNiu100.Player';
+local Cards = require 'Game.NiuNiu100.Cards';
+local Setting = require 'Game.NiuNiu100.Setting';
+local Rule = require 'Game.NiuNiu100.Rule';
+local Rank = require 'Game.NiuNiu100.Rank';
+local Trend = require 'Game.NiuNiu100.Trend';
+local Result = require 'Game.NiuNiu100.Result';
+local BetChip = require 'Common.BetChip';
+local CommonUtils = require 'Common.CommonUtils';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+_module.messages = "MsgNiu100SyncResp,MsgNiu100GameState,MsgNiu100Compare,"..
+    "MsgNiu100Settlement,MsgNiu100BetSucess,MsgNiu100BetFailed,MsgNiu100Rank,"..
+	"MsgNiu100RankList,MsgNiu100Trend,MsgNiu100BankerDisband,MsgDisband,"..
+	"MsgLeaveVenueResp,MsgAddAvatar,MsgRemoveAvatar";
+
+_module.GameState = {};
+_module.GameState.None = 0;
+_module.GameState.WaitNext = 1;
+_module.GameState.Betting = 2;
+_module.GameState.DealCard = 3;
+_module.GameState.Compare = 4;
+
+-- 比牌状态
+_module.CompareState = {};
+_module.CompareState.None = 0;				-- 不处于比牌状态
+_module.CompareState.ShowGenres = 1;		-- 显示牌型
+_module.CompareState.Desk2Banker = 2;		-- 筹码从牌桌到庄家
+_module.CompareState.Banker2Desk = 3;		-- 筹码从庄家到牌桌
+_module.CompareState.Desk2Player = 4;		-- 筹码从牌桌到玩家
+_module.CompareState.ShowScore = 5;			-- 显示所有玩家及庄家输赢
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Sounds");
+    local child1 = nil;
+    local child2 = nil;
+	if (child ~= nil) then
+		AudioControl.gameObject = child.gameObject;	
+		AudioControl:Awake();
+		self._audioCtrl = AudioControl;
+	end
+	child = obj.transform:Find("Bottom");
+    if (child ~= nil) then
+        child1 = child:Find("WaitNext");
+        if (child1 ~= nil) then
+            self._waitNext = child1.gameObject;
+        end
+        child1 = child:Find("Betting");
+        if (child1 ~= nil) then
+            self._betting = child1.gameObject;
+        end
+        child1 = child:Find("TextCoundown");
+        if (child1 ~= nil) then
+            self._textCountdown = child1.gameObject;
+        end
+    end
+	local ui = CS.NiuMa.LuaUGUI;
+    child = obj.transform:Find("TopBar");
+    if (child ~= nil) then
+        child1 = child:Find("BtnBack");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnBackClick);
+        end
+        child1 = child:Find("BtnSetting");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnSettingClick);
+        end
+        child1 = child:Find("BtnHelp");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnHelpClick);
+        end
+        child1 = child:Find("BtnHistory");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnHistoryClick);
+        end
+		child1 = child:Find("BtnDisband");
+        if (child1 ~= nil) then
+			self._btnDisband = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnDisbandClick);
+        end
+    end
+    self._betTotals = {};
+    self._myBets = {};
+    self._myBetLabels = {};
+    self._luckyStars = {};
+    child = obj.transform:Find("BetZones");
+    if (child ~= nil) then
+        for i = 1, 4 do
+            child1 = child:Find("Zone" .. i);
+            if (child1 ~= nil) then
+                ui.AddBtnClick(child1.gameObject, self["OnZone"..i.."Click"]);
+                child2 = child1:Find("TextTotal");
+                if (child2 ~= nil) then
+                    self._betTotals[i] = child2.gameObject;
+                end
+                child2 = child1:Find("BetLabel");
+                if (child2 ~= nil) then
+                    self._myBets[i] = child2.gameObject;
+                    child2 = child2:Find("Text");
+                    if (child2 ~= nil) then
+                        self._myBetLabels[i] = child2.gameObject;
+                    end
+                end
+                child2 = child1:Find("LuckyStar");
+                if (child2 ~= nil) then
+                    self._luckyStars[i] = child2.gameObject;
+                end
+            end
+        end
+    end
+    child = obj.transform:Find("Buttons");
+    if (child ~= nil) then
+        child1 = child:Find("BtnPlayerList");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnPlayerListClick);
+			child2 = child1:Find("Head");
+			if (child2 ~= nil) then
+				self._playerListPivot = child2;
+			end
+        end
+    end
+    child = obj.transform:Find("ChipGroup");
+    if (child ~= nil) then
+        child1 = child:Find("BetChip100");
+        if (child1 ~= nil) then
+            ui.AddToggleClick(child1.gameObject, self.OnBetChip100Check);
+        end
+        child1 = child:Find("BetChip500");
+        if (child1 ~= nil) then
+            ui.AddToggleClick(child1.gameObject, self.OnBetChip500Check);
+        end
+        child1 = child:Find("BetChip1000");
+        if (child1 ~= nil) then
+            ui.AddToggleClick(child1.gameObject, self.OnBetChip1000Check);
+        end
+        child1 = child:Find("BetChip2000");
+        if (child1 ~= nil) then
+            ui.AddToggleClick(child1.gameObject, self.OnBetChip2000Check);
+        end
+        child1 = child:Find("BetChip5000");
+        if (child1 ~= nil) then
+            ui.AddToggleClick(child1.gameObject, self.OnBetChip5000Check);
+        end
+        child1 = child:Find("BetChip10000");
+        if (child1 ~= nil) then
+            ui.AddToggleClick(child1.gameObject, self.OnBetChip10000Check);
+        end
+    end
+    self._players = {};
+    child = obj.transform:Find("Players");
+    if (child ~= nil) then
+        child1 = child:Find("PlayerMyself");
+        if (child1 ~= nil) then
+            self._playerMyself = Player.NewInstance();
+			self._playerMyself.gameObject = child1.gameObject;
+			self._playerMyself:Awake();
+        end
+        child1 = child:Find("PlayerBanker");
+        if (child1 ~= nil) then
+            self._playerBanker = Player.NewInstance();
+			self._playerBanker.gameObject = child1.gameObject;
+			self._playerBanker:Awake();
+        end
+        for i = 1, 6 do
+            child1 = child:Find("Player0" .. i);
+            if (child1 ~= nil) then
+                self._players[i] = Player.NewInstance();
+				self._players[i].gameObject = child1.gameObject;
+				self._players[i]:Awake();
+            end
+        end
+    end
+	Cards.gameObject = obj;
+	Cards:Awake();
+    self._cards = Cards;
+    child = obj.transform:Find("ChipPanel");
+    if (child ~= nil) then
+        self._chipParent = child;
+    end
+    child = obj.transform:Find("TipPanel");
+    if (child ~= nil) then
+        child1 = child:Find("StartBet");
+        if (child1 ~= nil) then
+            self._startBet = child1.gameObject;
+        end
+        child1 = child:Find("StopBet");
+        if (child1 ~= nil) then
+            self._stopBet = child1.gameObject;
+        end
+		child1 = child:Find("WaitNext");
+        if (child1 ~= nil) then
+            self._waitNextTip = child1.gameObject;
+        end
+    end
+	child = obj.transform:Find("SettingPanel");
+    if (child ~= nil) then
+		Setting.gameObject = child.gameObject;
+		Setting:Awake();
+		self._setting = Setting;
+	end
+	child = obj.transform:Find("RulePanel");
+    if (child ~= nil) then
+		Rule.gameObject = child.gameObject;
+		Rule:Awake();
+		self._rule = Rule;
+	end
+    child = obj.transform:Find("RankPanel");
+    if (child ~= nil) then
+		Rank.gameObject = child.gameObject;
+		Rank:Awake();
+		self._rank = Rank;
+	end
+    child = obj.transform:Find("TrendPanel");
+    if (child ~= nil) then
+		Trend.gameObject = child.gameObject;
+		Trend:Awake();
+		self._trend = Trend;
+	end
+	child = obj.transform:Find("ResultPanel");
+    if (child ~= nil) then
+		Result.gameObject = child.gameObject;
+		Result:Awake();
+		self._result = Result;
+	end
+    self._betChips = {};
+    self._gameState = _module.GameState.None;
+    self._chipLevel = 0;
+    self._countdown = 0;
+    self._totalBetAmounts = { 0, 0, 0, 0 };
+    self._myBetAmounts = { 0, 0, 0, 0 };
+    self._luckies = { false, false, false, false };
+    self._luckyEffects = {};
+	self._compareState = _module.CompareState.None;
+	self._compareElapsed = 0.0;
+end
+
+function _module:Start()
+    self._chipImages = {};
+    local sl = self.gameObject:GetComponent("SpriteList");
+    if (sl ~= nil) then
+        for i = 0, 5 do
+            table.insert(self._chipImages, sl:GetSprite(i));
+        end
+    end
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:Start();
+	end
+	local gm = CS.NiuMa.GameManager.Instance;
+    if (self._playerMyself ~= nil) then
+        self._playerMyself:Start();
+        self._playerMyself:SetPlayerId(gm.PlayerId);
+        self._playerMyself:SetName(gm.NickName);
+        self._playerMyself:SetGold(gm.Gold);
+        self._playerMyself:SetHeadTexture(gm.HeadTexture);
+    end
+    if (self._playerBanker ~= nil) then
+        self._playerBanker:Start();
+    end
+    if (self. _trend ~= nil) then
+        self._trend:Start();
+    end
+	if (self._result ~= nil) then
+		self._result:SetMyselfHead(gm.HeadTexture);
+		self._result:Start();
+	end
+    for i = 1, 6 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:Start();
+            self._players[i]:Show(false);
+        end
+    end
+	if (self._cards ~= nil) then
+		self._cards:Start();
+		self._cards:SetAudioCtrol(self._audioCtrl);
+	end
+    self._chipPrefab = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Common/BetChip", "prefabs/common.ab", "Assets/NiuMa/Resources/", ".prefab");
+	local nm = CS.NiuMa.NetworkManager.Instance;
+    nm:SendInnerMessage("MsgNiu100Sync");
+end
+
+function _module:Update()
+    self:UpdateCountdown();
+    self:UpdateBetTip();
+	if (self._cards ~= nil) then
+		self._cards:Update();
+	end
+	self:UpdateCompare();
+
+	if (self._playingBet) then
+		self._playingBetElapsed = self._playingBetElapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+		if (self._playingBetElapsed > 0.5) then
+			self._playingBet = false;
+		end
+	end
+end
+
+function _module:OnMessage(msgType, json)
+	if (msgType == "MsgNiu100SyncResp") then
+		self:OnSyncResp(json);
+    elseif (msgType == "MsgNiu100GameState") then
+        self:OnGameState(json);
+    elseif (msgType == "MsgNiu100Compare") then
+        self:OnCompare(json);
+	elseif (msgType == "MsgNiu100Settlement") then
+		self:OnSettlement(json);
+    elseif (msgType == "MsgNiu100BetSucess") then
+        self:OnBetSucess(json);
+    elseif (msgType == "MsgNiu100BetFailed") then
+        self:OnBetFailed(json);
+	elseif (msgType == "MsgNiu100Rank") then
+		self:OnRank(json);
+	elseif (msgType == "MsgNiu100RankList") then
+		self:OnRankList(json);
+    elseif (msgType == "MsgNiu100Trend") then
+		self:OnTrend(json);
+	elseif (msgType == "MsgNiu100BankerDisband") then
+		self:OnBankerDisband();
+	elseif (msgType == "MsgDisband") then
+		self:OnDisband();
+	elseif (msgType == "MsgLeaveVenueResp") then
+		self:OnLeaveVenueResp(json);
+	elseif (msgType == "MsgAddAvatar") then
+		self:OnAddAvatar(json);
+	elseif (msgType == "MsgRemoveAvatar") then
+		self:OnRemoveAvatar(json);
+    end
+end
+
+function _module.OnBackClick()
+    --请求退出房间
+	local nm = CS.NiuMa.NetworkManager.Instance;
+	if (nm:IsConnected()) then
+		nm:SendInnerMessage("MsgLeaveVenue");
+    else
+        local gm = CS.NiuMa.GameManager.Instance;
+		gm:DestroyGameRoom();
+		gm:GetCapital();
+    end
+end
+
+function _module.OnSettingClick()
+	local self = _module;
+	if (self._setting ~= nil) then
+        self._setting:Show(true);
+    end
+end
+
+function _module.OnHelpClick()
+	local self = _module;
+	if (self._rule ~= nil) then
+        self._rule:Show(true);
+    end
+end
+
+function _module.OnHistoryClick()
+	local self = _module;
+    if (self._trend ~= nil) then
+        self._trend:Show(true);
+    end
+    CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgNiu100GetTrend");
+end
+
+function _module.DoDisband()
+	--解散房间 
+	CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgDisbandRequest");
+end
+
+function _module.OnDisbandClick()
+	CS.NiuMa.GameManager.Instance:ShowPromptDialog("确定要解散房间吗？若点击确定，房间将在当前局结算之后解散。", _module.DoDisband);
+end
+
+function _module.OnZone1Click()
+	local self = _module;
+    self:DoBet(0);
+end
+
+function _module.OnZone2Click()
+    local self = _module;
+	self:DoBet(1);
+end
+
+function _module.OnZone3Click()
+    local self = _module;
+	self:DoBet(2);
+end
+
+function _module.OnZone4Click()
+    local self = _module;
+	self:DoBet(3);
+end
+
+function _module.OnPlayerListClick()
+    CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgNiu100GetRankList");
+end
+
+function _module.OnBetChip100Check(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._chipLevel = 0;
+end
+
+function _module.OnBetChip500Check(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._chipLevel = 1;
+end
+
+function _module.OnBetChip1000Check(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._chipLevel = 2;
+end
+
+function _module.OnBetChip2000Check(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._chipLevel = 3;
+end
+
+function _module.OnBetChip5000Check(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._chipLevel = 4;
+end
+
+function _module.OnBetChip10000Check(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._chipLevel = 5;
+end
+
+function _module:DoBet(zone)
+	local gm = CS.NiuMa.GameManager.Instance;
+    local msg = {};
+    msg.venueId = gm.VenueId;
+    msg.zone = zone;
+	msg.chip = self._chipLevel;
+    local json = rapidjson.encode(msg);
+	CS.NiuMa.NetworkManager.Instance:SendMessage("MsgNiu100Bet", json, true);
+end
+
+function _module:ClearBets()
+	local ui = CS.NiuMa.LuaUGUI;
+	for i = 1, 4 do
+        if (self._betTotals[i] ~= nil) then
+            ui.SetText(self._betTotals[i], "0");
+        end
+        if (self._myBets[i] ~= nil) then
+            self._myBets[i]:SetActive(false);
+        end
+        self._myBetAmounts[i] = 0;
+		self._totalBetAmounts[i] = 0;
+        if (self._luckyStars[i] ~= nil) then
+            self._luckyStars[i]:SetActive(false);
+        end
+        self._luckies[i] = false;
+    end
+end
+
+function _module:ClearTable()
+    if (self._waitNext ~= nil) then
+        self._waitNext:SetActive(false);
+    end
+    if (self._betting ~= nil) then
+        self._betting:SetActive(false);
+    end
+    self:EndCountdown();
+    for i = 1, 6 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:Show(false);
+        end
+    end
+	self:ClearBets();
+	self:ClearChips();
+	if (self._cards ~= nil) then
+		self._cards:ShowBacks(false);
+		self._cards:ResetGenres(false);
+		self._cards:ShowGenres(false);
+	end
+	self._showStartBet = false;
+	self._showStopBet = false;
+	self._compareState = self.CompareState.None;
+end
+
+function _module:OnSyncResp(json)
+    if (json == nil or #json == 0) then
+        return;
+    end
+    self:ClearTable();
+	local msg = rapidjson.decode(json);
+	if (self._cards ~= nil) then
+		self._cards:SetDemoTable(msg.demo);
+	end
+    self._gameState = msg.gameState;
+    if (self._playerBanker ~= nil) then
+        self._playerBanker:SetPlayerId(msg.bankerId);
+        self._playerBanker:SetName(msg.bankerName);
+        self._playerBanker:SetGold(msg.deposit);
+        self._playerBanker:SetHeadImgUrl(msg.bankerHeadImgUrl);
+    end
+	local isBanker = false;
+	if (self._playerMyself ~= nil) then
+		local playerId = self._playerMyself:GetPlayerId();
+		if (playerId == msg.bankerId) then
+			isBanker = true;
+		end
+		self._playerMyself:SetGold(msg.gold);
+	end
+	if (self._btnDisband ~= nil) then
+		self._btnDisband:SetActive(isBanker);
+	end
+    if (self._gameState == _module.GameState.Betting or
+        self._gameState == _module.GameState.DealCard or
+        self._gameState == _module.GameState.Compare) then
+		local ui = CS.NiuMa.LuaUGUI;
+        for i = 1, 4 do
+            self._totalBetAmounts[i] = msg.betTotals[i];
+            if (self._betTotals[i] ~= nil) then
+                ui.SetText(self._betTotals[i], tostring(msg.betTotals[i]));
+            end
+			self:AddMyBet(i, msg.myBetAmounts[i]);
+        end
+        local chipNums = {};
+        local nums = #(msg.chipNums);
+        local idx = 1;
+        for i = 1, 4 do
+            if (idx > nums) then
+                break;
+            end
+            chipNums[i] = {};
+            for j = 1, 6 do
+                chipNums[i][j] = msg.chipNums[idx];
+                idx = idx + 1;
+                if (idx > nums) then
+                    break;
+                end
+            end
+        end
+        self:CreateChips(chipNums);
+    end
+	if (self._gameState ~= _module.GameState.Betting) then
+		if (self._waitNextTip ~= nil) then
+			self._waitNextTip:SetActive(true);
+		end
+	end
+end
+
+-- 筹码区域(minX, minY, width, height)
+_module._chipRects = {};
+_module._chipRects[1] = { -438, -4, 180, 120 };
+_module._chipRects[2] = { -206, -4, 180, 120 };
+_module._chipRects[3] = { 26, -4, 180, 120 };
+_module._chipRects[4] = { 258, -4, 180, 120 };
+-- 筹码金额
+_module._chipAmounts = { 100, 500, 1000, 2000, 5000, 10000 };
+
+function _module.RandomChipPosition(zone)
+    local pos = CS.UnityEngine.Vector2(0.0, 0.0);
+    if (zone < 1 or zone > 4) then
+        return pos;
+    end
+	local util = CS.NiuMa.Utility;
+    pos.x = _module._chipRects[zone][1] + _module._chipRects[zone][3] * util.RandFloat();
+    pos.y = _module._chipRects[zone][2] + _module._chipRects[zone][4] * util.RandFloat();
+    return pos;
+end
+
+function _module:ClearChips()
+	local GameObject = CS.UnityEngine.GameObject;
+	for i = 1, 4 do
+		if (self._betChips[i] ~= nil) then
+			local nums = #(self._betChips[i]);
+			for j = 1, nums do
+				GameObject.Destroy(self._betChips[i][j].gameObject);
+			end
+			self._betChips[i] = {};
+		end
+	end
+end
+
+function _module:CreateChips(chipNums)
+    if (self._chipParent == nil or self._chipPrefab == nil) then
+        return;
+    end
+	local Vector3 = CS.UnityEngine.Vector3;
+	local Quaternion = CS.UnityEngine.Quaternion;
+	local GameObject = CS.UnityEngine.GameObject;
+	local util = CS.NiuMa.Utility;
+    local obj = nil;
+    local axis = Vector3(0.0, 0.0, 1.0);
+    for i = 1, 4 do
+		if (self._betChips[i] == nil) then
+			self._betChips[i] = {};
+		end
+        for j = 1, 6 do
+            for k = 1, chipNums[i][j] do
+                obj = GameObject.Instantiate(self._chipPrefab, self._chipParent);
+                local rot = -180.0 + 360.0 * util.RandFloat();
+                obj.transform.anchoredPosition = self.RandomChipPosition(i);
+                obj.transform.localRotation = Quaternion.AngleAxis(rot, axis);
+                obj.transform.localScale = Vector3(0.65, 0.65, 1.0);
+                local chip = BetChip.NewInstance();
+				chip.gameObject = obj;
+				chip:Awake();
+                chip:SetImage(self._chipImages[j]);
+                chip:SetAmount(self._chipAmounts[j]);
+                table.insert(self._betChips[i], chip);
+            end
+        end
+    end
+end
+
+function _module:ThrowChip(startPoint, zone, chip)
+    --print(tostring(startPoint));
+    if (self._chipParent == nil or self._chipPrefab == nil) then
+        return;
+    end
+    --print("ThrowChip");
+	local Vector3 = CS.UnityEngine.Vector3;
+    local obj = CS.UnityEngine.GameObject.Instantiate(self._chipPrefab, self._chipParent);
+    local rot = -180.0 + 360.0 * CS.NiuMa.Utility.RandFloat();
+    local axis = Vector3(0.0, 0.0, 1.0);
+    local rectTrans = obj.transform;
+    rectTrans.anchoredPosition = startPoint;
+    rectTrans.localRotation = CS.UnityEngine.Quaternion.AngleAxis(rot, axis);
+    obj.transform.localScale = Vector3(0.7, 0.7, 1.0);
+    local betChip = BetChip.NewInstance();
+	betChip.gameObject = obj;
+	betChip:Awake();
+	betChip:SetOwner(self);
+    betChip:SetImage(self._chipImages[chip]);
+    betChip:SetAmount(self._chipAmounts[chip]);
+
+	if (self._betChips[zone] == nil) then
+		self._betChips[zone] = {};
+	end
+    table.insert(self._betChips[zone], betChip);
+
+	local doTween = CS.NiuMa.LuaDOTween;
+    local tweener = doTween.DOAnchorPos(obj, self.RandomChipPosition(zone), 0.5);
+	doTween.SetEase(tweener, CS.DG.Tweening.Ease.OutCubic);
+	doTween.OnComplete(tweener, betChip:OnThrowComplete());
+end
+
+function _module:OnMoveChipEnd(chip)
+	local doTween = CS.NiuMa.LuaDOTween;
+	local tweener = doTween.DOScale(chip, CS.UnityEngine.Vector3(0.65, 0.65, 1.0), 0.2);
+	doTween.SetEase(tweener, CS.DG.Tweening.Ease.OutCubic);
+end
+
+function _module:UpdateCountdown()
+    if (not self._showCountdown) then
+        return;
+    end
+	if (self._lastSecond == nil) then
+		self._lastSecond = 15;
+	end
+    self._countdown = self._countdown - CS.UnityEngine.Time.unscaledDeltaTime;
+    if (self._countdown > 0) then
+        local sec = math.floor(self._countdown + 0.5);
+		if (self._lastSecond ~= sec) then
+			self._lastSecond = sec;
+			if (self._audioCtrl ~= nil) then
+				if (sec < 5 and sec > 1) then
+					self._audioCtrl:GameClip("Sounds/Game/NiuNiu100/countdown");
+				elseif (sec == 1) then
+					self._audioCtrl:GameClip("Sounds/Game/NiuNiu100/alert");
+				end
+			end
+		end
+        if (self._textCountdown ~= nil) then
+            CS.NiuMa.LuaUGUI.SetText(self._textCountdown, tostring(sec));
+        end
+    else
+        self:EndCountdown();
+    end
+end
+
+function _module:StartCountdown(total, elapsed)
+    if (self._textCountdown ~= nil) then
+        self._textCountdown:SetActive(true);
+    end
+    self._countdown = total - elapsed;
+    self._showCountdown = true;
+end
+
+function _module:EndCountdown()
+    if (self._textCountdown ~= nil) then
+        self._textCountdown:SetActive(false);
+    end
+    self._showCountdown = false;
+end
+
+function _module:OnGameState(json)
+    if (json == nil or #json == 0) then
+        return;
+    end
+	local Vector2 = CS.UnityEngine.Vector2;
+	local doTween = CS.NiuMa.LuaDOTween;
+	local msg = rapidjson.decode(json);
+    self._gameState = msg.gameState;
+	if (self._gameState == _module.GameState.WaitNext) then
+		if (self._waitNext ~= nil) then
+			self._waitNext:SetActive(true);
+		end
+		self:StartCountdown(10.0, msg.elapsed / 1000);
+	elseif (self._gameState == _module.GameState.Betting) then
+		if (self._result ~= nil) then
+			self._result:Show(false);
+		end
+		if (self._cards ~= nil) then
+			self._cards:ResetGenres(false);
+			self._cards:ShowGenres(false);
+		end
+		if (msg.elapsed == 0) then
+			self:ClearBets();
+		end
+		if (self._waitNextTip ~= nil) then
+			self._waitNextTip:SetActive(false);
+		end
+		if (self._waitNext ~= nil) then
+			self._waitNext:SetActive(false);
+		end
+		if (self._betting ~= nil) then
+			self._betting:SetActive(true);
+		end
+		self:StartCountdown(15.0, msg.elapsed / 1000);
+		-- 提示开始下注动画
+		if (msg.elapsed < 10000) then
+			if (self._startBet ~= nil) then
+				self._startBet:SetActive(true);
+				local rectTrans = self._startBet.transform;
+				rectTrans.anchoredPosition = Vector2(-1000.0, 0.0);
+				local tweener = doTween.DOAnchorPos(self._startBet, Vector2(0.0, 0.0), 0.3);
+				doTween.OnComplete(tweener, self.OnMoveTipHalf);
+				self._showStartBet = true;
+				self._betTipElapsed = 0.0;
+				if (self._audioCtrl ~= nil) then
+					self._audioCtrl:GameClip("Sounds/Game/NiuNiu100/show");
+				end
+			end
+		end
+	elseif (self._gameState == _module.GameState.DealCard) then
+		if (self._betting ~= nil) then
+			self._betting:SetActive(false);
+		end
+		-- 提示停止下注动画
+		if (msg.elapsed == 0) then
+			if (self._stopBet ~= nil) then
+				self._stopBet:SetActive(true);
+				local rectTrans = self._stopBet.transform;
+				rectTrans.anchoredPosition = Vector2(-1000.0, 0.0);
+				local tweener = doTween.DOAnchorPos(self._stopBet, Vector2(0.0, 0.0), 0.3);
+				doTween.OnComplete(tweener, _module.OnMoveTipHalf);
+				self._showStopBet = true;
+				self._betTipElapsed = 0.0;
+				if (self._audioCtrl ~= nil) then
+					self._audioCtrl:GameClip("Sounds/Game/NiuNiu100/show");
+				end
+			end
+		elseif (msg.elapsed < 1500) then
+			if (self._cards ~= nil) then
+				self._cards:DealCards();
+			end
+		else
+			--已经过了发牌动画时机，直接显示牌(背面)
+			if (self._cards ~= nil) then
+				self._cards:ResetBacks();
+				self._cards:ShowBacks(true);
+			end
+		end
+	end
+end
+
+function _module:UpdateBetTip()
+    local tip = nil;
+    if (self._showStartBet) then
+        tip = self._startBet;
+    elseif (self._showStopBet) then
+        tip = self._stopBet;
+    end
+    if (tip == nil) then
+        return;
+    end
+    self._betTipElapsed = self._betTipElapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+    if (self._betTipElapsed > 1) then
+		local doTween = CS.NiuMa.LuaDOTween;
+        local tweener = doTween.DOAnchorPos(tip, CS.UnityEngine.Vector2(1000.0, 0.0), 0.3);
+        doTween.OnComplete(tweener, self.OnMoveTipEnd);
+		self._showStartBet = false;
+        self._showStopBet = false;
+    end
+end
+
+function _module.OnMoveTipHalf()
+	local self = _module;
+	if (self._showStartBet) then
+		if (self._audioCtrl ~= nil) then
+			self._audioCtrl:GameClip("Sounds/Game/NiuNiu100/start");
+		end
+	elseif (self._showStopBet) then
+		if (self._audioCtrl ~= nil) then
+			self._audioCtrl:PlayerClip("Sounds/Game/NiuNiu100/stop", 7);
+		end
+	end
+end
+
+function _module.OnMoveTipEnd()
+	local self = _module;
+    if (self._startBet ~= nil) then
+        self._startBet:SetActive(false);
+    end
+    if (self._stopBet ~= nil) then
+        self._stopBet:SetActive(false);
+    end
+    if (self._gameState == _module.GameState.DealCard) then
+        -- 开始发牌动画
+		if (self._cards ~= nil) then
+			self._cards:DealCards();
+		end
+    end
+end
+
+function _module:OnCompare(json)
+	if (json == nil or #json == 0) then
+        return;
+    end
+	self._gameState = _module.GameState.Compare;
+	local msg = rapidjson.decode(json);
+	self._compareState = self.CompareState.ShowGenres;
+	self._compareElapsed = msg.elapsed / 1000;
+	self._compareData = msg;
+	if (self._cards ~= nil) then
+		self._cards:ShowBacks(false);
+		self._cards:ShowGenres(true);
+		self._cards:ResetGenres(true);
+		for i = 1, 5 do
+			self._cards:ShowGenre1(i, msg.genres[i].cards);
+		end
+	end
+end
+
+function _module:UpdateCompare()
+	if (self._compareState == self.CompareState.None or self._compareData == nil or self._cards == nil) then
+		return;
+	end
+	local oldElapsed = self._compareElapsed;
+	self._compareElapsed = self._compareElapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+	if (self._compareState == self.CompareState.ShowGenres) then
+		local timePoints1 = { 1.2, 2.3, 3.4, 4.5, 5.6 };
+		local timePoints2 = { 1.6, 2.7, 3.8, 4.9, 6.0 };
+		for i = 1, 5 do
+			if (oldElapsed < timePoints1[i] and self._compareElapsed > timePoints1[i]) then
+				self._cards:ShowGenre2(i);
+				break;
+			end
+		end
+		for i = 1, 5 do
+			if (oldElapsed < timePoints2[i] and self._compareElapsed > timePoints2[i]) then
+				local genreType = self._compareData.genres[i].genre;
+				local bet = false;
+				local mul = 0;
+				local score = 0;
+				if (i > 1) then
+					bet = (self._myBetAmounts[i - 1] > 0);
+					mul = self._compareData.multiples[i - 1];
+					score = self._compareData.scores[i - 1];
+				end
+				self._cards:ShowGenreType(i, genreType, bet, mul, score);
+				if (i == 5) then
+					-- 牌型已经显示完成，进入到下一个比牌状态
+					self._compareState = self.CompareState.Desk2Banker;
+					self._compareElapsed = 0.0;
+				end
+				break;
+			end
+		end
+	end
+	if (self._compareState == self.CompareState.Desk2Banker) then
+		if (oldElapsed < 1.0 and self._compareElapsed > 1.0) then
+			local test = true;
+			for i = 1, 4 do
+				if (self._compareData.bankerScores[i] > 0) then
+					self:MoveChips2Banker(i);
+					test = false;
+				end
+			end
+			self._compareState = self.CompareState.Banker2Desk;
+			if (test) then
+				-- 庄家在所有下注区域都没有赢，直接进入到下一个比牌状态
+				oldElapsed = 0.75;
+				self._compareElapsed = 0.85;
+			else
+				self._compareElapsed = 0;
+			end
+		end
+	end
+	if (self._compareState == self.CompareState.Banker2Desk) then
+		if (oldElapsed < 0.8 and self._compareElapsed > 0.8) then
+			local test = true;
+			for i = 1, 4 do
+				if (self._compareData.bankerScores[i] < 0) then
+					self:BankerThrowChips(i, self._compareData.bankerScores[i] * -1);
+					test = false;
+				end
+			end
+			self._compareState = self.CompareState.Desk2Player;
+			if (test) then
+				-- 庄家在所有下注区域都没有输，直接进入到下一个比牌状态
+				oldElapsed = 0.75;
+				self._compareElapsed = 0.85;
+			else
+				self._compareElapsed = 0;
+			end
+		end
+	end
+	if (self._compareState == self.CompareState.Desk2Player) then
+		if (oldElapsed < 0.8 and self._compareElapsed > 0.8) then
+			local test = true;
+			if (self._winCoins == nil) then
+				self._winCoins = { false, false, false, false, false, false, false, false };
+			else
+				for i = 1, 8 do
+					self._winCoins[i] = false;
+				end
+			end
+			for i = 1, 4 do
+				if (self._compareData.bankerScores[i] < 0) then
+					self:MoveChips2Player(i);
+					test = false;
+				end
+			end
+
+			self._compareState = self.CompareState.ShowScore;
+			if (test) then
+				-- 所有玩家在所有下注区域都没有赢，直接进入到下一个比牌状态
+				oldElapsed = 0.45;
+				self._compareElapsed = 0.55;
+			else
+				self._compareElapsed = 0;
+			end
+		end
+	end
+	if (self._compareState == self.CompareState.ShowScore) then
+		if (oldElapsed < 0.5 and self._compareElapsed > 0.5) then
+			self:ShowScores();
+			self._compareState = self.CompareState.None;	-- 比牌状态结束
+		end
+	end
+end
+
+-- 下注区域的筹码全部移动到庄家
+function _module:MoveChips2Banker(zone)
+	if (self._betChips[zone] == nil or self._playerBanker == nil) then
+		return ;
+	end
+	local nums = #(self._betChips[zone]);
+	if (nums == 0) then
+		return;
+	end
+	local doTween = CS.NiuMa.LuaDOTween;
+	local endPoint = self._playerBanker:GetHeadPosition(self._chipParent);
+	for i = 1, nums do
+		local chip = self._betChips[zone][i];
+		local tweener = doTween.DOAnchorPos(chip.gameObject, endPoint, 0.5);
+		doTween.SetEase(tweener, CS.DG.Tweening.Ease.InCubic);
+        doTween.OnComplete(tweener, chip:OnBackComplete());
+	end
+	self._betChips[zone] = {};
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:GameClip("Sounds/Game/NiuNiu100/wincoin");
+	end
+end
+
+-- 庄家向下注区域投掷筹码
+function _module:BankerThrowChips(zone, amount)
+	if (zone < 1 or zone > 4) then
+		return;
+	end
+	local startPoint = self._playerBanker:GetHeadPosition(self._chipParent);
+	local chipNums = { 0, 0, 0, 0, 0, 0 };
+	local tmp = 0;
+	for i = 6, 1, -1 do
+		tmp = math.floor(amount / self._chipAmounts[i]);
+		chipNums[i] = tmp;
+		amount = amount - (self._chipAmounts[i] * tmp);
+	end
+	for i = 1, 6 do
+		for j = 1, chipNums[i] do
+			self:ThrowChip(startPoint, zone, i);
+		end
+	end
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:GameClip("Sounds/Game/NiuNiu100/betcoin");
+	end
+end
+
+-- 下注区域的筹码全部移动到玩家
+function _module:MoveChips2Player(zone)
+	if (zone < 1 or zone > 4) then
+		return;
+	end
+	if (self._compareData.bankerScores[zone] < 0) then
+		local amount = self._compareData.bankerScores[zone] * -1;
+		local seats = {};
+		local myPlayerId = self._playerMyself:GetPlayerId();
+		local total = 0;
+		local rankScores = nil;
+		-- 检查排行榜座位上的玩家在该下注区域是否赢金
+		for i = 1, 6 do
+			local playerId = self._players[i]:GetPlayerId();
+			rankScores = self._compareData["rankScores" .. tostring(i)];
+			if (CommonUtils.IsStringNotEmpty(playerId) and playerId ~= myPlayerId) then
+				if (rankScores[zone] > 0) then
+					total = total + rankScores[zone];
+					table.insert(seats, i);
+				end
+			end
+		end
+		-- 检查本机玩家在该下注区域是否赢金
+		if (self._compareData.scores[zone] > 0) then
+			total = total + self._compareData.scores[zone];
+			table.insert(seats, 7);
+		end
+		-- 检查除了本机玩家及排行榜座位上的玩家外是否还有其他玩家赢金
+		if (total < amount) then
+			table.insert(seats, 8);
+		end
+		local nums1 = #seats;
+		if (nums1 == 0) then
+			return;
+		end
+		local doTween = CS.NiuMa.LuaDOTween;
+		local nums2 = #(self._betChips[zone]);
+		local nums3 = math.floor(nums2 / nums1);
+		local endPoint = nil;
+		local s = 1;
+		local e = 1;
+		for i = 1, nums1 do
+			if (seats[i] < 7) then
+				endPoint = self._players[seats[i]]:GetHeadPosition(self._chipParent);
+			elseif (seats[i] == 7) then
+				endPoint = self._playerMyself:GetHeadPosition(self._chipParent);
+			elseif (seats[i] == 8) then
+				endPoint = self:GetPlayerListPosition();
+			end
+			if (not self._winCoins[seats[i]]) then
+				self._winCoins[seats[i]] = true;
+				if (self._audioCtrl ~= nil) then
+					self._audioCtrl:GameClip("Sounds/Game/NiuNiu100/wincoin");
+				end
+			end
+			e = s + nums3 - 1;
+			if (i == nums1) then
+				e = nums2;
+			end
+			for j = s, e do
+				local chip = self._betChips[zone][j];
+				if (chip == nil) then
+					print("zone:"..zone..",nums1:"..nums1..",nums2:"..nums2..",nums3:"..nums3..",j:"..j);
+				end
+				local tweener = doTween.DOAnchorPos(chip.gameObject, endPoint, 0.5);
+				doTween.SetEase(tweener, CS.DG.Tweening.Ease.InCubic);
+				doTween.OnComplete(tweener, chip:OnBackComplete());
+			end
+			s = e + 1;
+		end
+		self._betChips[zone] = {};
+	end
+end
+
+-- 显示所有玩家及庄家的输赢分
+function _module:ShowScores()
+	local total = 0.0;
+	for i = 1, 4 do
+		total = total + self._compareData.bankerScores[i];
+	end
+	if (total ~= 0) then
+		self._playerBanker:SetScore(total);
+	end
+	self._playerBanker:SetGold(self._compareData.deposit);
+	total = 0.0;
+	for i = 1, 4 do
+		total = total + self._myBetAmounts[i];
+	end
+	if (total > 0) then
+		total = 0.0;
+		for i = 1, 4 do
+			total = total + self._compareData.scores[i];
+		end
+		if (total ~= 0) then
+			self._playerMyself:SetScore(total);
+		end
+		self._playerMyself:SetGold(self._compareData.gold);
+		CS.NiuMa.GameManager.Instance.Gold = self._compareData.gold;
+	end
+	local playerId = nil;
+	local rankScores = nil;
+	for i = 1, 6 do
+		playerId = self._players[i]:GetPlayerId();
+		if (CommonUtils.IsStringNotEmpty(playerId)) then
+			total = 0;
+			rankScores = self._compareData["rankScores" .. tostring(i)];
+			for j = 1, 4 do
+				total = total + rankScores[j];
+			end
+			if (total ~= 0) then
+				self._players[i]:SetScore(total);
+			end
+			self._players[i]:SetGold(self._compareData.rankGolds[i]);
+		end
+	end
+end
+
+function _module:OnSettlement(json)
+	if (self._result == nil) then
+		return;
+	end
+	if (json == nil or #json == 0) then
+        return;
+    end
+	local msg = rapidjson.decode(json);
+	self._result:Show(true);
+	self._result:SetPlayerName(1, self._playerBanker:GetName());
+	self._result:SetPlayerHead(1, self._playerBanker:GetHeadTexture());
+	self._result:OnSettlement(msg);
+	if (self._audioCtrl ~= nil) then
+		local clipName = "";
+		if (msg.score > 0) then
+			clipName = "Sounds/Game/NiuNiu100/win";
+		elseif (msg.score < 0) then
+			clipName = "Sounds/Game/NiuNiu100/lose";
+		else
+			clipName = "Sounds/Game/NiuNiu100/valid";
+		end
+		self._audioCtrl:GameClip(clipName);
+	end
+end
+
+function _module:GetPlayerListPosition()
+	if (self._playerListPosition ~= nil) then
+        return self._playerListPosition;
+    end
+	if (self._playerListPivot ~= nil) then
+        self._playerListPosition = CS.NiuMa.LuaUGUI.WorldPointToLocalPointInRectangle(self._chipParent, self._playerListPivot.position);
+    end
+    if (self._playerListPosition == nil) then
+        self._playerListPosition = CS.UnityEngine.Vector2(0.0, 0.0);
+    end
+    return self._playerListPosition;
+end
+
+function _module:ShakePlayerList()
+	if (self._playerListAnimator == nil) then
+		if (self._playerListPivot ~= nil) then
+			self._playerListAnimator = self._playerListPivot.gameObject:GetComponent("Animator");
+		end
+	end
+	if (self._playerListAnimator ~= nil) then
+		self._playerListAnimator:SetTrigger("Shake");
+	end
+end
+
+function _module:OnBetSucess(json)
+    if (json == nil or #json == 0) then
+        return;
+    end
+    local msg = rapidjson.decode(json);
+    local playerId = msg.playerId;
+    local zone = msg.zone + 1;
+    local chip = msg.chip + 1;
+    local mySelf = false;
+    local player1 = nil;
+    local player2 = nil;
+	local seat = 0;
+    if ((self._playerMyself ~= nil) and (playerId == self._playerMyself:GetPlayerId())) then
+        self:AddMyBet(zone, self._chipAmounts[chip]);
+        player1 = self._playerMyself;
+        mySelf = true;
+    end
+    for i = 1, 6 do
+        if ((self._players[i] ~= nil) and (playerId == self._players[i]:GetPlayerId())) then
+            player2 = self._players[i];
+			seat = i;
+            break;
+        end
+    end
+    if (mySelf) then
+		seat = 7;
+	else
+        player1 = player2;
+    end
+	if (player1 ~= nil) then
+		player1:AddBet(self._chipAmounts[chip]);
+		player1:ShakeHead();
+		self:ThrowChip(player1:GetHeadPosition(self._chipParent), zone, chip);
+        if (mySelf and (player2 ~= nil)) then
+            player2:AddBet(self._chipAmounts[chip]);
+        end
+	else
+		seat = 8;
+		self:ShakePlayerList();
+		self:ThrowChip(self:GetPlayerListPosition(), zone, chip);
+	end
+    self._totalBetAmounts[zone] = self._totalBetAmounts[zone] + self._chipAmounts[chip];
+    if (self._betTotals[zone] ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._betTotals[zone], tostring(self._totalBetAmounts[zone]));
+    end
+    if (not self._luckies[zone]) then
+        if ((self._players[1] ~= nil) and (playerId == self._players[1]:GetPlayerId())) then
+            self._luckies[zone] = true;
+            self:LuckyStarFlutter(zone);
+        end
+    end
+	-- 可能多人同时下注，多人同时播放下注声音会造成音爆，效果不好这里避免这种情况
+	if (self._audioCtrl ~= nil and not self._playingBet) then
+		if (seat == 1) then
+			self._audioCtrl:PlayerClip("Sounds/Game/NiuNiu100/betcoin", seat);
+		else
+			self._audioCtrl:PlayerClip("Sounds/Game/NiuNiu100/on_bet", seat);
+		end
+		self._playingBet = true;
+		self._playingBetElapsed = 0.0;
+	end
+end
+
+function _module:LuckyStarFlutter(zone)
+    if (self._players[1] == nil or self._chipParent == nil) then
+        return;
+    end
+    if (self._luckyStarPrefab == nil) then
+        local prefabName = "Prefabs/Common/LuckyStar";
+        self._luckyStarPrefab = CS.NiuMa.ResourceManager.Instance:LoadResource(prefabName, "prefabs/common.ab", "Assets/NiuMa/Resources/", ".prefab");
+    end
+    if (self._luckyStarPrefab == nil) then
+        return;
+    end
+	local Vector2 = CS.UnityEngine.Vector2;
+    if (self._luckyStarPoints == nil) then
+        self._luckyStarPoints = {};
+        self._luckyStarPoints[1] = {};
+        self._luckyStarPoints[1][1] = Vector2(116, 340);
+        self._luckyStarPoints[1][2] = Vector2(-428, 168);
+        self._luckyStarPoints[2] = {};
+        self._luckyStarPoints[2][1] = Vector2(226, 340);
+        self._luckyStarPoints[2][2] = Vector2(-196, 168);
+        self._luckyStarPoints[3] = {};
+        self._luckyStarPoints[3][1] = Vector2(326, 320);
+        self._luckyStarPoints[3][2] = Vector2(36, 168);
+        self._luckyStarPoints[4] = {};
+        self._luckyStarPoints[4][1] = Vector2(432, 300);
+        self._luckyStarPoints[4][2] = Vector2(268, 168);
+    end
+    local startPoint = self._players[1]:GetHeadPosition(self._chipParent);
+    local obj = CS.UnityEngine.GameObject.Instantiate(self._luckyStarPrefab, self._chipParent);
+    if (obj ~= nil) then
+        obj.transform.anchoredPosition = startPoint;
+        local path = obj:GetComponent("BezierPath");
+        if (path ~= nil) then
+            path:SetPath(startPoint, self._luckyStarPoints[zone][1], self._luckyStarPoints[zone][2], 1.0);
+            path:SetMove2EndCallback(self.OnPathLuckyStar2End, zone);
+        end
+        self._luckyEffects[zone] = obj;
+    end
+end
+
+function _module.OnPathLuckyStar2End(zone)
+	local self = _module;
+    if (self._luckyStars[zone] ~= nil) then
+        self._luckyStars[zone]:SetActive(true);
+    end
+    if (self._luckyEffects[zone] ~= nil) then
+        CS.UnityEngine.GameObject.Destroy(self._luckyEffects[zone]);
+    end
+end
+
+function _module:AddMyBet(zone, amount)
+    self._myBetAmounts[zone] = self._myBetAmounts[zone] + amount;
+    if (self._myBetAmounts[zone] > 0) then
+        if (self._myBets[zone] ~= nil) then
+            self._myBets[zone]:SetActive(true);
+        end
+        if (self._myBetLabels[zone] ~= nil) then
+            CS.NiuMa.LuaUGUI.SetText(self._myBetLabels[zone], tostring(self._myBetAmounts[zone]));
+        end
+    end
+end
+
+function _module:OnBetFailed(json)
+    if (json == nil or #json == 0) then
+        return;
+    end
+    local msg = rapidjson.decode(json);
+    CS.NiuMa.GameManager.Instance:ShowPromptTip(msg.errMsg, 3.0);
+end
+
+function _module:OnRank(json)
+    if (json == nil or #json == 0) then
+        return;
+    end
+    local msg = rapidjson.decode(json);
+	for i = 1, 6 do
+		if (self._players[i] ~= nil) then
+			self._players[i]:SetPlayerId(msg.rankIds[i]);
+			if (CommonUtils.IsStringEmpty(msg.rankIds[i])) then
+				self._players[i]:Show(false);
+			else
+				self._players[i]:Show(true);
+				self._players[i]:SetName(msg.names[i]);
+				self._players[i]:SetGold(msg.golds[i]);
+				self._players[i]:SetHeadImgUrl(msg.headImgUrls[i]);
+			end
+		end
+	end
+end
+
+function _module:OnRankList(json)
+    if (self._rank == nil) then
+        return;
+    end
+	if (json == nil or #json == 0) then
+        return;
+    end
+    local msg = rapidjson.decode(json);
+    self._rank:Show(true);
+    self._rank:OnRankList(msg);
+end
+
+function _module:OnTrend(json)
+    if (self._trend == nil) then
+        return;
+    end
+	if (json == nil or #json == 0) then
+        return;
+    end
+    local msg = rapidjson.decode(json);
+    self._trend:OnTrend(msg);
+end
+
+function _module:OnBankerDisband()
+	CS.NiuMa.GameManager.Instance:ShowPromptTip("庄家已请求解散房间，房间将在当前局结算后解散。", 3.0);
+end
+
+function _module:OnDisband()
+	CS.NiuMa.GameManager.Instance:ShowPromptDialog("房间已解散，请点击确定返回大厅。", self.OnBackClick);
+end
+
+function _module:OnLeaveVenueResp(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+    local gm = CS.NiuMa.GameManager.Instance;
+	if (msg.result == 0) then
+		--离开成功，直接退出
+		gm:DestroyGameRoom();
+	    gm:GetCapital();
+	else
+		--离开失败
+		gm:ShowPromptTip(msg.errMsg, 3.0);
+	end
+end
+
+function _module:OnAddAvatar(json)
+	--玩家进入
+end
+
+function _module:OnRemoveAvatar(json)
+	--玩家离开
+end
+
+return _module;

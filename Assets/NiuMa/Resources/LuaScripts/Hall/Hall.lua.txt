@@ -1,0 +1,419 @@
+-- 描述：客户端大厅界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.10.25
+
+local base = require 'BehaviourBase';
+local DlgTableList = require 'Hall.DlgTableList';
+local DlgAgency = require 'Hall.DlgAgency';
+local DlgExchange = require 'Hall.DlgExchange';
+local DlgShop = require 'Hall.DlgShop';
+local DlgBank = require 'Hall.DlgBank';
+local DlgPersonalCenter = require 'Hall.DlgPersonalCenter';
+local DlgEmail = require 'Hall.DlgEmail';
+local DlgService = require 'Hall.DlgService';
+local Notice = require 'Hall.Notice';
+local com_def = require 'Common.Defines';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child = obj.transform:Find("Canvas/Player");
+	local child1 = nil;
+	local ui = CS.NiuMa.LuaUGUI;
+	if (child ~= nil) then
+		child1 = child:Find("HeadTexture");
+		if (child1 ~= nil) then
+			self._headTexture = child1.gameObject;
+			ui.AddBtnClick(child1.gameObject, self.OnHeadClick);
+		end
+		child1 = child:Find("TextName");
+		if (child1 ~= nil) then
+			self._labelName = child1.gameObject;
+		end
+		child1 = child:Find("Gold/BtnAddGold");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnAddGoldClick);
+		end
+		child1 = child:Find("Gold/TextGold");
+		if (child1 ~= nil) then
+			self._labelGold = child1.gameObject;
+		end
+		child1 = child:Find("Diamond/BtnAddDiamond");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnAddDiamondClick);
+		end
+		child1 = child:Find("Diamond/TextDiamond");
+		if (child1 ~= nil) then
+			self._labelDiamond = child1.gameObject;
+		end
+	end
+	child = obj.transform:Find("Canvas/Notice");
+	if (child ~= nil) then
+		child1 = child:Find("Bottom/ClipRect");
+		if (child1 ~= nil) then
+			Notice.gameObject = child1.gameObject;
+			Notice:Awake();
+			self._notice = Notice;
+		end
+	end
+	child = obj.transform:Find("Canvas/SlideAdvertisement");
+	if (child ~= nil) then
+		child1 = child:Find("ScrollView/Viewport/Content/Page1/QRCode");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnQRCodeClick);
+		end
+	end
+	child = obj.transform:Find("Canvas/Buttons");
+	if (child ~= nil) then
+		child1 = child:Find("BtnBank");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnBankClick);
+		end
+		child1 = child:Find("BtnExchange");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnExchangeClick);
+		end
+        child1 = child:Find("BtnAgency");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnAgencyClick);
+		end
+		child1 = child:Find("BtnRoom");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnRoomClick);
+		end
+		child1 = child:Find("BtnMail");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnEmailClick);
+		end
+		child1 = child:Find("BtnShop");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnShopClick);
+		end
+	end
+	child = obj.transform:Find("Canvas/Popups");
+	if (child ~= nil) then
+		child1 = child:Find("DlgTableList");
+		if (child1 ~= nil) then
+			DlgTableList.gameObject = child1.gameObject;
+			DlgTableList:Awake();
+			self._dlgTableList = DlgTableList;
+		end
+        child1 = child:Find("DlgAgency");
+		if (child1 ~= nil) then
+			DlgAgency.gameObject = child1.gameObject;
+			DlgAgency:Awake();
+			self._dlgAgency = DlgAgency;
+		end
+		child1 = child:Find("DlgExchange");
+		if (child1 ~= nil) then
+			DlgExchange.gameObject = child1.gameObject;
+			DlgExchange:Awake();
+			self._dlgExchange = DlgExchange;
+		end
+		child1 = child:Find("DlgShop");
+		if (child1 ~= nil) then
+			DlgShop.gameObject = child1.gameObject;
+			DlgShop:Awake();
+			self._dlgShop = DlgShop;
+		end
+		child1 = child:Find("DlgBank");
+		if (child1 ~= nil) then
+			DlgBank.gameObject = child1.gameObject;
+			DlgBank:Awake();
+			self._dlgBank = DlgBank;
+		end
+		child1 = child:Find("DlgPersonalCenter");
+		if (child1 ~= nil) then
+			DlgPersonalCenter.gameObject = child1.gameObject;
+			DlgPersonalCenter:Awake();
+			self._dlgPersonalCenter = DlgPersonalCenter
+		end
+		child1 = child:Find("DlgEmail");
+		if (child1 ~= nil) then
+			DlgEmail.gameObject = child1.gameObject;
+			DlgEmail:Awake();
+			self._dlgEmail = DlgEmail;
+		end
+		child1 = child:Find("DlgService");
+		if (child1 ~= nil) then
+			DlgService.gameObject = child1.gameObject;
+			DlgService:Awake();
+			self._dlgService = DlgService;
+		end
+	end
+end
+
+function _module:Start()
+	if (self._dlgTableList ~= nil) then
+		self._dlgTableList:Start();
+	end
+    if (self._dlgAgency ~= nil) then
+		self._dlgAgency:Start();
+	end
+	if (self._dlgExchange ~= nil) then
+		self._dlgExchange:Start();
+	end
+	if (self._dlgShop ~= nil) then
+		self._dlgShop:SetHall(self);
+		self._dlgShop:Start();
+	end
+	if (self._dlgBank ~= nil) then
+		self._dlgBank:Start();
+		self._dlgBank:SetHall(self);
+	end
+	if (self._dlgPersonalCenter ~= nil) then
+		self._dlgPersonalCenter:Start();
+	end
+	if (self._dlgEmail ~= nil) then
+		self._dlgEmail:Start();
+	end
+	--初始化玩家数据
+	self:InitPlayerData();
+	--播放背景音乐
+	self:PlayBackgroundMusic();
+end
+
+function _module:InitPlayerData()
+	local ui = CS.NiuMa.LuaUGUI;
+	local gm = CS.NiuMa.GameManager.Instance;
+	if (self._headTexture ~= nil) then
+		local tex = gm.HeadTexture;
+		local avatar = gm.Avatar;
+		if (tex ~= nil) then
+			ui.SetTexture(self._headTexture, tex);
+		elseif (avatar ~= nil and #avatar > 0) then
+			CS.NiuMa.HttpRequester.Instance:GetTexture(avatar, self.OnLoadHeadTexture);
+		end
+	end
+	if (self._labelName ~= nil) then
+		ui.SetText(self._labelName, gm.NickName);
+	end
+	if (self._labelGold ~= nil) then
+		ui.SetText(self._labelGold, tostring(gm.Gold));
+	end
+	if (self._labelDiamond ~= nil) then
+		ui.SetText(self._labelDiamond, tostring(gm.Diamond));
+	end
+end
+
+function _module.OnLoadHeadTexture(tex)
+	if (tex == nil) then
+		return;
+	end
+	local self = _module;
+	CS.NiuMa.LuaUGUI.SetTexture(self._headTexture, tex);
+	CS.NiuMa.GameManager.Instance.HeadTexture = tex;
+end
+
+function _module:PlayBackgroundMusic()
+	local bgMusic = CS.NiuMa.AudioManager.Instance.BackgroundMusic;
+    if (bgMusic == nil) then
+        return ;
+    end
+    local resName = "Sounds/Main/bg_hall";
+    local audioClip = CS.NiuMa.ResourceManager.Instance:LoadResource(resName, "sounds/main.ab", "Assets/NiuMa/Resources/", ".mp3");
+    if (audioClip ~= nil) then
+        bgMusic.clip = audioClip;
+        bgMusic:Play();
+    end
+end
+
+function _module:Update()
+    if (self._dlgAgency ~= nil and self._dlgAgency:IsVisible()) then
+		self._dlgAgency:Update();
+	end
+	if (self._dlgExchange ~= nil and self._dlgExchange:IsVisible()) then
+		self._dlgExchange:Update();
+	end
+	if (self._notice ~= nil) then
+		self._notice:Update();
+	end
+end
+
+function _module:OnBuyDiamond()
+	local ui = CS.NiuMa.LuaUGUI;
+	local gm = CS.NiuMa.GameManager.Instance;
+	if (self._labelGold ~= nil) then
+		ui.SetText(self._labelGold, tostring(gm.Gold));
+	end
+	if (self._labelDiamond ~= nil) then
+		ui.SetText(self._labelDiamond, tostring(gm.Diamond));
+	end
+end
+
+function _module:RefreshTableRecords(tableType)
+    local msg = bd_pb.NetMsg2Int();
+    msg.Val1 = tableType;
+    msg.Val2 = 0;
+    local pb_data = msg:SerializeToString();
+	LuaGameUtilities.SendMessage("PH_TABLE_RECORDS", "NetMsg2Int", pb_data);
+end
+
+
+function _module:PromptJoinLocked(tableID, tableType, create)
+	local text = "";
+	print("PromptJoinLocked, tableID:" .. tableID .. ", tableType:" .. tableType);
+	if (tableID == 0) then
+		if (not create) then
+			text = "加入房间失败，该房间游戏已开始。"
+		else
+			text = "创建房间失败，当前在未知游戏中。"
+		end
+		GameManager.Instance:ShowPromptDialog(text);
+	else
+		local innerName = com_def.GameInnerNameFromType(tableType);
+		local gameName = com_def.GameNameFromType(tableType);
+		local loaded = GameManager.Instance:IsGameLoaded(innerName);
+		if (loaded) then
+			if (create) then
+				text = "创建房间失败，当前正在" .. gameName .. "游戏中，点击确定返回该游戏。";
+			else
+				text = "加入房间失败，当前正在" .. gameName .. "游戏中，点击确定返回该游戏。";
+			end
+			self._backTableID = tableID;
+			self._backTableType = tableType;
+			local del = Events.UnityAction(_module.BackGame, self);
+			GameManager.Instance:ShowPromptDialog(text, del);
+		else
+			if (create) then
+				text = "创建房间失败，当前正在" .. gameName .. "游戏中，";
+			else
+				text = "加入房间失败，当前正在" .. gameName .. "游戏中，"
+			end
+			text = text .. "但该游戏未加载无法直接返回游戏，请从大厅第一次进入该游戏完成加载。";
+			GameManager.Instance:ShowPromptDialog(text);
+		end
+	end
+end
+
+function _module.OnHeadClick()
+	local self = _module;
+	if (self._dlgPersonalCenter ~= nil) then
+		self._dlgPersonalCenter:Show(true);
+		self._dlgPersonalCenter:OnShowDialog();
+	end
+end
+
+function _module.OnAddGoldClick()
+	CS.NiuMa.GameManager.Instance:ShowPromptTip("充值请联系客服或代理", 2.0);
+end
+
+function _module.OnAddDiamondClick()
+	local self = _module;
+	self.OnShopClick();
+end
+
+function _module.OnQRCodeClick()
+	CS.NiuMa.Utility.CopyToClipboard("http://106.13.15.226:8896/download");
+    CS.NiuMa.GameManager.Instance:ShowPromptTip("下载地址复制成功", 2.0);
+end
+
+function _module.OnBankClick()
+	local self = _module;
+	if (self._dlgBank ~= nil) then
+		self._dlgBank:Show(true);
+		self._dlgBank:OnShowDialog();
+	end
+end
+
+function _module.OnExchangeClick()
+	local self = _module;
+	if (self._dlgExchange ~= nil) then
+		self._dlgExchange:Show(true);
+		self._dlgExchange:OnShowDialog();
+	end
+end
+
+function _module.OnAgencyClick()
+	local self = _module;
+	local gm = CS.NiuMa.GameManager.Instance;
+	if (not gm.IsAgency) then
+		gm:ShowPromptTip("您不是代理，若要成为代理请联系您的直接上级代理", 2.0);
+		return;
+	end
+	if (self._dlgAgency ~= nil) then
+		self._dlgAgency:Show(true);
+		self._dlgAgency:OnShowDialog();
+	end
+end
+
+function _module.OnRoomClick()
+	local self = _module;
+	if (self._dlgTableList ~= nil) then
+		self._dlgTableList:Show(true);
+		self._dlgTableList:RefreshTableList();
+	end
+end
+
+function _module.OnEmailClick()
+	local self = _module;
+	if (self._dlgEmail ~= nil) then
+		self._dlgEmail:Show(true);
+	end
+end
+
+function _module.OnShopClick()
+	local self = _module;
+	if (self._dlgShop ~= nil) then
+		self._dlgShop:Show(true);
+	end
+end
+
+function _module.OnCapitalChange()
+	local self = _module;
+	local ui = CS.NiuMa.LuaUGUI;
+	local gm = CS.NiuMa.GameManager.Instance;
+	if (self._labelGold ~= nil) then
+		ui.SetText(self._labelGold, tostring(gm.Gold));
+	end
+	if (self._labelDiamond ~= nil) then
+		ui.SetText(self._labelDiamond, tostring(gm.Diamond));
+	end
+end
+
+function _module.OnGameClick(gameName)
+	local self = _module;
+	if (gameName == "Mahjong") then
+		self:OnMahjongClick();
+	elseif (gameName == "NiuNiu100") then
+		self:OnNiuNiu100Click();
+	elseif (gameName == "BiJi") then
+		self:OnBiJiClick();
+	elseif (gameName == "Lackey") then
+		self:OnLackeyClick();
+	else
+		CS.NiuMa.GameManager.Instance:ShowPromptTip("暂未开放，敬请期待", 2.0);
+	end
+end
+
+function _module:OnMahjongClick()
+	local obj = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/Mahjong/Hall", "prefabs/mahjong_main.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (obj ~= nil) then
+		CS.NiuMa.GameManager.Instance:CreateHallRoom("Mahjong-Hall", obj, true);
+	end
+end
+
+function _module:OnNiuNiu100Click()
+	local obj = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/NiuNiu100/Hall", "prefabs/niuniu100.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (obj ~= nil) then
+		CS.NiuMa.GameManager.Instance:CreateHallRoom("NiuNiu100-Hall", obj, true);
+	end
+end
+
+function _module:OnBiJiClick()
+	local obj = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/BiJi/Hall", "prefabs/biji.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (obj ~= nil) then
+		CS.NiuMa.GameManager.Instance:CreateHallRoom("BiJi-Hall", obj, true);
+	end
+end
+
+function _module:OnLackeyClick()
+	local obj = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/Lackey/Hall", "prefabs/lackey.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (obj ~= nil) then
+		CS.NiuMa.GameManager.Instance:CreateHallRoom("Lackey-Hall", obj, true);
+	end
+end
+
+return _module;

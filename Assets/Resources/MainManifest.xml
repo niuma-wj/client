@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MainManifest>
+  <AssetBundle>common.ab</AssetBundle>
+  <AssetBundle>configs.ab</AssetBundle>
+  <AssetBundle>gamelist.ab</AssetBundle>
+  <AssetBundle>hall/main.ab</AssetBundle>
+  <AssetBundle>hall/dialogs.ab</AssetBundle>
+  <AssetBundle>prefabs/common.ab</AssetBundle>
+  <AssetBundle>prefabs/hall.ab</AssetBundle>
+  <AssetBundle>prefabs/gamelist.ab</AssetBundle>
+  <AssetBundle>sounds/main.ab</AssetBundle>
+  <AssetBundle>luascripts.ab</AssetBundle>
+</MainManifest>

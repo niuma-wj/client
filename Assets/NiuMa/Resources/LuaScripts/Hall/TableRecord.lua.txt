@@ -1,0 +1,118 @@
+--local GameManager = Bird.GameManager;
+--local LuaGameUtilities = Bird.LuaGameUtilities;
+--local LuaUGUI = Bird.LuaUGUI;
+--local WWW = UnityEngine.WWW;
+--local String = System.String;
+--local bd_pb = require 'Protobuf.NetMsgBaseDatas_pb';
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    self._tableRecords = {};
+    local obj = self.gameObject;
+    local child = obj.transform:Find("HeadFrame/HeadTexture");
+    if (child ~= nil) then
+        self._headTexture = child.gameObject;
+    end
+    child = obj.transform:Find("PlayerPanel/Gold/Text");
+    if (child ~= nil) then
+        self._textGold = child.gameObject;
+    end
+    child = obj.transform:Find("PlayerPanel/TextName");
+    if (child ~= nil) then
+        self._textName = child.gameObject;
+    end
+    child = obj.transform:Find("TextRoomID");
+    if (child ~= nil) then
+        self._textRoomID = child.gameObject;
+    end
+    child = obj.transform:Find("TextPlayerNums");
+    if (child ~= nil) then
+        self._textPlayerNums = child.gameObject;
+    end
+    child = obj.transform:Find("BtnJoin");
+    if (child ~= nil) then
+        CS.NiuMa.LuaUGUI.AddBtnClick(child.gameObject, self.OnJoinClick);
+    end
+    child = obj.transform:Find("Private");
+    if (child ~= nil) then
+        self._private = child.gameObject;
+    end
+end
+
+function _module:Start()
+end
+
+function _module:SetTableRecord(rec)
+    self._tableID = rec.TableID;
+    self._tableType = rec.TableType;
+    if (self._textGold ~= nil) then
+        LuaUGUI.SetText(self._textGold, String.Format("{0:0.##}", rec.Deposit));
+    end
+    if (self._textName ~= nil) then
+        LuaUGUI.SetText(self._textName, rec.OwnerName);
+    end
+    if (self._headTexture ~= nil) then
+		local tex = GameManager.Instance:GetTextureByUrl(rec.OwnerHeadImgUrl);
+		if (tex ~= nil) then
+			LuaUGUI.SetTexture(self._headTexture, tex);
+		else
+			coroutine.start(_module.LoadHeadTexture, self, rec.OwnerHeadImgUrl);
+		end
+	end
+    if (self._textRoomID ~= nil) then
+		local tmp = 1000 + self._tableType;
+		if (tmp == self._tableID) then
+			LuaUGUI.SetText(self._textRoomID, "演示房");
+		else
+			LuaUGUI.SetText(self._textRoomID, tostring(self._tableID));
+		end
+    end
+    if (self._textPlayerNums ~= nil) then
+        local text = "";
+        if (rec.MaxPlayerNums > 0) then
+            text = rec.PlayerNums .. "/" .. rec.MaxPlayerNums .. "人";
+        else
+            text = rec.PlayerNums .. "人";
+        end
+        LuaUGUI.SetText(self._textPlayerNums, text);
+    end
+	--print("public:" .. tostring(rec.Public));
+    if (rec.Public == 0 and self._private ~= nil) then
+        self._private:SetActive(true);
+    end
+end
+
+function _module.LoadHeadTexture(inst, url)
+	if (url == nil or #url == 0) then
+		return;
+	end
+	local www = WWW(url);
+    coroutine.www(www);
+	if (www.isDone) then
+        local err = www.error;
+        if (err ~= nil and #err > 0) then
+            print(err);
+		else
+            GameManager.Instance:AddTextureUrl(url, www.texture);
+            if (inst._headTexture ~= nil) then
+			    LuaUGUI.SetTexture(inst._headTexture, www.texture);
+            end
+		end
+	end
+end
+
+function _module:OnJoinClick()
+    if (self._tableID == nil or self._tableType == nil) then
+        return;
+    end
+    local msg = bd_pb.NetMsg3Int();
+	msg.Val1 = self._tableID;
+	msg.Val2 = self._tableType;
+	msg.Val3 = -1;
+	local pb_data = msg:SerializeToString();
+	LuaGameUtilities.SendMessage("PH_JOIN_TABLE", "NetMsg3Int", pb_data);
+end
+
+return _module;

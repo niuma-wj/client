@@ -1,0 +1,55 @@
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child = obj.transform:Find("Tile");
+	if (child ~= nil) then
+		self._mb = child.gameObject:GetComponent("MahjongBrick");
+	end
+	self._show = true;
+	self._showElapsed = 0.0;
+end
+
+function _module:Start()
+	if (self.gameObject ~= nil) then
+		self.gameObject:SetActive(false); 
+	end
+	self._show = false;
+end
+
+function _module:Update()
+	if (not self._show) then
+		return;
+	end
+	self._showElapsed = self._showElapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+    if (self._showElapsed > 1.0) then
+        self.gameObject:SetActive(false);
+        self._show = false;
+    end
+end
+
+function _module:SetMahjongSprites(obj)
+	if (self._mb ~= nil) then
+        self._mb:SetMahjongSprites(obj);
+	end
+end
+
+function _module:ShowTile(tile)
+    self.gameObject:SetActive(true);
+    if (self._mb ~= nil) then
+        self._mb:SetMahjongTile(tile.pattern, tile.number, 0);
+	end
+    self._showElapsed = 0.0;
+    self._show = true;
+end
+
+--因为PlayTileViewer被多个地方引用到，而每个引用的地方必须有独立的PlayTileViewer实例，因此外部不能直接引用_module，
+--而是调用NewInstance函数创建实例
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

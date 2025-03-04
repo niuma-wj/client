@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+import "UserData.proto";
+
+message FairUserData
+{
+	required UserData UserData = 1;
+	required double Gold = 2;
+	required double Deposit = 3;
+	required sint32 Diamonds = 4;
+	required sint32 VipLevel = 5;
+	required bool IsAgency = 8;
+}

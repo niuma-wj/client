@@ -1,0 +1,129 @@
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("TextCode");
+    if (child ~= nil) then
+        self._textCode = child.gameObject;
+    end
+    child = obj.transform:Find("TextTime");
+    if (child ~= nil) then
+        self._textTime = child.gameObject;
+    end
+    self._headTextures = {};
+    self._textNames = {};
+    self._textScores = {};
+    self._textWinGolds = {};
+    for i = 1, 4 do
+        child = obj.transform:Find("Player0"..i);
+        if (child ~= nil) then
+            local child1 = child:Find("HeadTexture");
+            if (child1 ~= nil) then
+                self._headTextures[i] = child1.gameObject;
+            end
+            child1 = child:Find("TextName");
+            if (child1 ~= nil) then
+                self._textNames[i] = child1.gameObject;
+            end
+            child1 = child:Find("TextScore");
+            if (child1 ~= nil) then
+                self._textScores[i] = child1.gameObject;
+            end
+            child1 = child:Find("TextWinGold");
+            if (child1 ~= nil) then
+                self._textWinGolds[i] = child1.gameObject;
+            end
+        end
+    end
+	child = obj.transform:Find("BtnPlayback");
+    if (child ~= nil) then
+        local func = self:OnPlaybackClick();
+		CS.NiuMa.LuaUGUI.AddBtnClick(child.gameObject, func);
+    end
+end
+
+function _module:Start()
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetDlgZhanJi(dlg)
+    self._dlgZhanJi = dlg;
+end
+
+function _module:SetRecord(rec)
+    local ui = CS.NiuMa.LuaUGUI;
+	self._id = rec.id;
+    if (self._textCode ~= nil) then
+        local code = rec.number.."-"..tostring(rec.roundNo);
+        ui.SetText(self._textCode, code);
+    end
+    if (self._textTime ~= nil) then
+        ui.SetText(self._textTime, rec.time);
+    end
+    for i = 1, 4 do
+        if (self._headTextures[i] ~= nil) then
+		    local tex = self._dlgZhanJi:GetHeadTextureByUrl(rec.players[i].headUrl);
+		    if (tex ~= nil) then
+			    ui.SetTexture(self._headTextures[i], tex);
+		    else
+                local func = self:OnGetHeadTexture(rec.players[i].headUrl, i);
+			    CS.NiuMa.HttpRequester.Instance:GetTexture(rec.players[i].headUrl, func);
+		    end
+	    end
+        if (self._textNames[i] ~= nil) then
+            ui.SetText(self._textNames[i], rec.players[i].nickname);
+        end
+        if (self._textScores[i] ~= nil) then
+            ui.SetText(self._textScores[i], tostring(rec.scores[i]));
+        end
+        if (self._textWinGolds[i] ~= nil) then
+             ui.SetText(self._textWinGolds[i], tostring(rec.winGolds[i]));
+        end
+    end
+end
+
+function _module:OnGetHeadTexture(url, idx)
+    local inst = self;
+    return function(tex)
+        local self = inst;
+        if (self._headTextures[idx] ~= nil) then
+			CS.NiuMa.LuaUGUI.SetTexture(self._headTextures[idx], tex);
+		end
+        if (self._dlgZhanJi ~= nil) then
+		    self._dlgZhanJi:AddHeadTexture(url, tex);
+        end
+    end
+end
+
+function _module:OnPlaybackClick()
+    --以函数闭包的方式保存当前self实例，注意此时self并不等于_module
+    local inst = self;
+    return function()
+        local self = inst;
+	    if (self._id == nil) then
+		    return ;
+	    end
+        if (self._dlgZhanJi:IsRequesting()) then
+            return;
+        end
+        local url = "/player/game/mahjong/playback?id="..tostring(self._id);
+        local gm = CS.NiuMa.GameManager.Instance;
+        gm:AuthGet(url, self._dlgZhanJi.OnGetPlayback);
+        self._dlgZhanJi:SetRequesting(true)
+    end
+end
+
+
+--因为ZhanJiRound会创建多个实例，因此外部不能直接引用_module，而是调用NewInstance函数创建实例
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

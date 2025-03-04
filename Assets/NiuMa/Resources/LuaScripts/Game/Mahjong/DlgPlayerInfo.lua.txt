@@ -1,0 +1,113 @@
+-- 描述：麻将玩家信息界面
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.10
+
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local ui = CS.NiuMa.LuaUGUI;
+	ui.AddBtnClick(obj, self.OnBlankClick);
+	local child = obj.transform:Find("Frame/HeadFrame/HeadTexture");
+	if (child ~= nil) then
+		self._headTexture = child.gameObject;
+	end
+	child = obj.transform:Find("Frame/Female");
+	if (child ~= nil) then
+		self._female = child.gameObject;
+	end
+	child = obj.transform:Find("Frame/Male");
+	if (child ~= nil) then
+		self._male = child.gameObject;
+	end
+	child = obj.transform:Find("Frame/TextName");
+	if (child ~= nil) then
+		self._textName = child.gameObject;
+	end
+	child = obj.transform:Find("Frame/TextID");
+	if (child ~= nil) then
+		self._textID = child.gameObject;
+	end
+	child = obj.transform:Find("Frame/TextIP");
+	if (child ~= nil) then
+		self._textIP = child.gameObject;
+	end
+	child = obj.transform:Find("Frame/TextAddress");
+	if (child ~= nil) then
+		self._textAddress = child.gameObject;
+	end
+	for i = 1, 4 do
+		child = obj.transform:Find("Frame/Item"..i);
+		if (child ~= nil) then
+			ui.AddBtnAction(child.gameObject, self.OnEffectClick, i);
+		end
+	end
+end
+
+function _module:Start()
+	self.gameObject:SetActive(false);
+end
+
+function _module:SetHeadTexture(tex)
+	if (self._headTexture ~= nil) then
+		CS.NiuMa.LuaUGUI.SetTexture(self._headTexture, tex);
+	end
+end
+
+function _module:SetSex(sex)
+	if (self._male ~= nil) then
+		self._male:SetActive(sex == 2);
+	end
+	if (self._female ~= nil) then
+		self._female:SetActive(sex == 1);
+	end
+end
+
+function _module:SetName(name)
+	if (self._textName ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textName, name);
+	end
+end
+
+function _module:SetPlayerId(playerId)
+	self._playerId = playerId;
+	if (self._textID ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textID, id);
+	end
+end
+
+function _module:SetIP(ip)
+	if (self._textIP ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textIP, ip);
+	end
+end
+
+function _module:SetAddress(addr)
+	if (self._textAddress ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textAddress, addr);
+	end
+end
+
+function _module.OnBlankClick()
+	local self = _module;
+	self.gameObject:SetActive(false);
+end
+
+function _module.OnEffectClick(idx)
+	local self = _module;
+	local gm = CS.NiuMa.GameManager.Instance;
+    local nm = CS.NiuMa.NetworkManager.Instance;
+	local msg = {};
+	msg.venueId = gm.VenueId;
+	msg.index = idx;
+	msg.targetId = self._playerId;
+	local json = rapidjson.encode(msg);
+    nm:SendMessage("MsgEffectClient", json, true);
+	self.gameObject:SetActive(false);
+end
+
+return _module;

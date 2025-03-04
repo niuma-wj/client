@@ -1,0 +1,36 @@
+-- 描述：比鸡对话框界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.28
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child = obj.transform:Find("Frame/BtnClose");
+    if (child ~= nil) then
+        local func = self:OnCloseClick();
+        CS.NiuMa.LuaUGUI.AddBtnClick(child.gameObject, func);
+	end
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:OnCloseClick()
+    local inst = self;
+    return function()
+        local self = inst
+        self:Show(false);
+    end
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

@@ -1,0 +1,279 @@
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson')
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("Frame/Left");
+    local child1 = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+        child1 = child:Find("TextName");
+        if (child1 ~= nil) then
+            self._textName = child1.gameObject;
+        end
+        child1 = child:Find("HeadTexture");
+        if (child1 ~= nil) then
+            self._headTexture = child1.gameObject;
+        end
+        child1 = child:Find("Gold/Text");
+        if (child1 ~= nil) then
+            self._textGold = child1.gameObject;
+        end
+        child1 = child:Find("Diamond/Text");
+        if (child1 ~= nil) then
+            self._textDiamond = child1.gameObject;
+        end
+        child1 = child:Find("BtnLogout");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnLogoutClick);
+        end
+    end
+    child = obj.transform:Find("Frame/Right");
+    if (child ~= nil) then
+        child1 = child:Find("TextLoginTime/Text");
+        if (child1 ~= nil) then
+            self._textLoginTime = child1.gameObject;
+        end
+        child1 = child:Find("TextLoginIP/Text");
+        if (child1 ~= nil) then
+            self._textLoginIP = child1.gameObject;
+        end
+        child1 = child:Find("TextID/Text");
+        if (child1 ~= nil) then
+            self._textID = child1.gameObject;
+        end
+        child1 = child:Find("TextAgency/Text");
+        if (child1 ~= nil) then
+            self._textAgency = child1.gameObject;
+        end
+        child1 = child:Find("TextAgencyID/Text");
+        if (child1 ~= nil) then
+            self._textAgencyID = child1.gameObject;
+        end
+        child1 = child:Find("BtnCopyMyID");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnCopyMyIDClick);
+        end
+        child1 = child:Find("BtnCopyAgencyID");
+        if (child1 ~= nil) then
+            self._btnCopyAgencyID = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnCopyAgencyIDClick);
+        end
+        child1 = child:Find("BtnBind");
+        if (child1 ~= nil) then
+            self._btnBind = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnBindClick);
+        end
+    end
+    child = obj.transform:Find("Frame/BtnClose");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnCloseClick);
+	end
+    child = obj.transform:Find("BindAgency");
+    if (child ~= nil) then
+        self._dlgBindAgency = child.gameObject;
+        child1 = child:Find("Dialog/InputAgency");
+        if (child1 ~= nil) then
+            self._inputAgency = child1.gameObject;
+        end
+        child1 = child:Find("Dialog/BtnOk");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnOkClick);
+        end
+        child1 = child:Find("Dialog/BtnCancel");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnCancelClick);
+        end
+    end
+    self._first = true;
+    self._getData = false;
+    self._texHead = nil;
+    self._agencyID = "";
+    self._binding = false;
+end
+
+function _module:Start()
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+	self:Show(false);
+end
+
+function _module:OnShowDialog()
+    local ui = CS.NiuMa.LuaUGUI;
+    local gm = CS.NiuMa.GameManager.Instance;
+    if (self._first) then
+        if (self._textName ~= nil) then
+            ui.SetText(self._textName, gm.NickName);
+        end
+        if (self._textID ~= nil) then
+            ui.SetText(self._textID, tostring(gm.PlayerId));
+        end
+        self._first = false;
+    end
+    if (not self._texHead) then
+        self._texHead = gm.HeadTexture;
+        if (self._texHead ~= nil and self._headTexture ~= nil) then
+            ui.SetTexture(self._headTexture, self._texHead);
+        end
+    end
+    if (self._textGold ~= nil) then
+        ui.SetText(self._textGold, tostring(gm.Gold));
+    end
+    if (self._textDiamond ~= nil) then
+        ui.SetText(self._textDiamond, tostring(gm.Diamond));
+    end
+    if (not self._getData) then
+        gm:AuthGet("/player/personal/data", self.OnPersonalData);
+    end
+end
+
+--该函数作为回调代理，不能以对象方法的方式传递，即此处用"."而不是用":"
+--因此函数内不存在LUA内置的self
+function _module.OnPersonalData(code, text)
+    if (code ~= 200) then
+		print("Get personal data failed: " .. text);
+        return;
+	end
+    local self = _module;
+    local ui = CS.NiuMa.LuaUGUI;
+    self._getData = true;
+    local jsonObj = rapidjson.decode(text);
+    local agencyId = jsonObj.agencyId;
+    local agencyName = jsonObj.agencyName;
+    local lastIP = jsonObj.loginIp;
+    local lastTime = jsonObj.loginDate;
+    local boundAgency = true;
+    if (agencyId == nil or agencyId == rapidjson.null or #agencyId == 0) then
+        agencyId = nil;
+        boundAgency = false;
+    end
+    if (self._textLoginTime ~= nil) then
+        ui.SetText(self._textLoginTime, lastTime);
+    end
+    if (self._textLoginIP ~= nil) then
+        ui.SetText(self._textLoginIP, lastIP);
+    end
+    if (self._textAgency ~= nil) then
+        if (boundAgency) then
+            ui.SetText(self._textAgency, agencyName);
+        else
+            ui.SetText(self._textAgency, "无");
+        end
+    end
+    if (self._textAgencyID ~= nil) then
+        if (boundAgency) then
+            ui.SetText(self._textAgencyID, agencyId);
+        else
+            ui.SetText(self._textAgencyID, "无");
+        end
+    end
+    if (self._btnCopyAgencyID ~= nil) then
+        self._btnCopyAgencyID:SetActive(boundAgency);
+    end
+    if (self._btnBind ~= nil) then
+        self._btnBind:SetActive(not boundAgency);
+    end
+    self._agencyID = agencyId;
+end
+
+function _module.OnLogoutClick()
+    local self = _module;
+    local text = "确定要退出登录吗？";
+	CS.NiuMa.GameManager.Instance:ShowPromptDialog(text, self.DoLogout);
+end
+
+function _module.DoLogout()
+    CS.NiuMa.GameManager.Instance:Logout();
+end
+
+function _module.OnCopyMyIDClick()
+    local gm = CS.NiuMa.GameManager.Instance;
+    CS.NiuMa.Utility.CopyToClipboard(gm.PlayerId);
+    gm:ShowPromptTip("复制ID到剪切板成功", 2.0);
+end
+
+function _module.OnCopyAgencyIDClick()
+    local self = _module;
+    CS.NiuMa.Utility.CopyToClipboard(self._agencyID);
+    CS.NiuMa.GameManager.Instance:ShowPromptTip("复制上级代理ID到剪切板成功", 2.0);
+end
+
+function _module.OnBindClick()
+    local self = _module;
+    if (self._dlgBindAgency ~= nil) then
+        self._dlgBindAgency:SetActive(true);
+    end
+end
+
+function _module.OnOkClick()
+    local self = _module;
+    if (self._binding) then
+        return;
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local agencyId = "";
+    if (self._inputAgency ~= nil) then
+        agencyId = ui.GetInputText(self._inputAgency);
+    end
+    if (agencyId == nil or #agencyId == 0) then
+        gm:ShowPromptTip("请输入代理玩家ID", 2.0);
+        return;
+    end
+    local t = {};
+    t.playerId = agencyId;
+    local body = rapidjson.encode(t);
+    gm:AuthPost("/player/agency/bind", body, self.OnBindAgency);
+    self._binding = true;
+    if (self._dlgBindAgency ~= nil) then
+        self._dlgBindAgency:SetActive(false);
+    end
+end
+
+function _module.OnCancelClick()
+    local self = _module;
+    if (self._dlgBindAgency ~= nil) then
+        self._dlgBindAgency:SetActive(false);
+    end
+end
+
+function _module.OnBindAgency(code, text)
+    local self = _module;
+    self._binding = false;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code == 200) then
+        local agencyId = t.agencyId;
+        local agencyName = t.agencyName;
+        self._agencyID = agencyId;
+        if (self._textAgency ~= nil) then
+            ui.SetText(self._textAgency, agencyName);
+        end
+        if (self._textAgencyID ~= nil) then
+            ui.SetText(self._textAgencyID, agencyId);
+        end
+        gm:ShowPromptTip("绑定代理成功", 2.0);
+    else
+        local msg = t.msg;
+        if (msg == nil or #msg == 0) then
+            msg = text;
+        end
+        msg = "绑定代理失败：" .. msg;
+        gm:ShowPromptTip(msg, 2.0);
+    end
+end
+
+return _module;

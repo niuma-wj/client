@@ -1,0 +1,415 @@
+-- 描述：百人牛牛扑克牌脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.19
+
+local base = require 'BehaviourBase';
+local pok_def = require 'Common.PokerDefines';
+local Poker = require 'Common.Poker';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = nil;
+    local child1 = nil;
+	local child2 = nil;
+	self._genres = {};
+    self._cardParents = {};
+    self._genreMultiples = {};
+    self._genreScores = {};
+	self._backs = {};
+	child = obj.transform:Find("CardPanel");
+    if (child ~= nil) then
+		for i = 1, 5 do
+			child1 = child:Find("Genre" .. i);
+			if (child1 ~= nil) then
+				self._genres[i] = child1.gameObject;
+				self._cardParents[i] = {};
+				for j = 1, 5 do
+					self._cardParents[i][j] = child1:Find("Card" .. j);
+				end
+				if (i > 1) then
+					child2 = child1:Find("TextMultiple");
+					if (child2 ~= nil) then
+						self._genreMultiples[i] = child2.gameObject;
+					end
+					child2 = child1:Find("TextScore");
+					if (child2 ~= nil) then
+						self._genreScores[i] = child2.gameObject;
+					end
+				else
+					self._genreMultiples[i] = nil;
+					self._genreScores[i] = nil;
+				end
+			end
+		end
+	end
+	child = obj.transform:Find("DealPanel");
+    if (child ~= nil) then
+		for i = 1, 5 do
+			self._backs[i] = {};
+			for j = 1, 5 do
+				child1 = child:Find("Back" .. i .. j);
+				if (child1 ~= nil) then
+					self._backs[i][j] = child1.gameObject;
+				end
+			end
+		end
+	end
+    self._dealing = false;
+    self._dealElapsed = 0.0;
+    self._dealPlayer = 0;
+    self._dealCard = 0;
+	self._dealInterval = 0.05;
+end
+
+function _module:Start()
+	self._cardPositions = {};
+    local Vector2 = CS.UnityEngine.Vector2;
+    for i = 1, 5 do
+		self._cardPositions[i] = {};
+        for j = 1, 5 do
+            if (self._backs[i][j] ~= nil) then
+				local rcTrans = self._backs[i][j].transform;
+				local pos = rcTrans.anchoredPosition;
+				self._cardPositions[i][j] = Vector2(pos.x, pos.y);
+				local path = self._backs[i][j]:GetComponent("BezierPath");
+				if (path ~= nil) then
+					local idx = (i - 1) * 5 + (j - 1);
+					path:SetMove2EndCallback(self.OnPathBack2End, idx);
+				end
+                self._backs[i][j]:SetActive(false);
+            end
+        end
+    end
+end
+
+function _module:Update()
+    if (not self._dealing) then
+        return;
+    end
+    self._dealElapsed = self._dealElapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+    if (self._dealElapsed < self._dealInterval) then
+        return;
+    end
+    self._dealElapsed = self._dealElapsed - self._dealInterval;
+    local back = self._backs[self._dealPlayer][self._dealCard];
+    if (back ~= nil) then
+        back:SetActive(true);
+		back.transform.anchoredPosition = CS.UnityEngine.Vector2(0.0, 0.0);
+        local path = back:GetComponent("BezierPath");
+        if (path ~= nil) then
+            path:DoPath();
+			if (self._audioCtrl ~= nil) then
+				self._audioCtrl:GameClip("Sounds/Game/NiuNiu100/sendcard");
+			end
+        end
+    end
+	if (self._dealCard == 1) then
+		self._dealInterval = 0.05;
+	end
+    self._dealCard = self._dealCard + 1;
+    if (self._dealCard > 5) then
+        self._dealCard = 1;
+        self._dealPlayer = self._dealPlayer + 1;
+        if (self._dealPlayer > 5) then
+            self._dealing = false;
+        end
+		self._dealInterval = 0.2;
+    end
+end
+
+function _module:SetDemoTable(demo)
+	self._demoTable = demo;
+end
+
+function _module:SetAudioCtrol(ac)
+	self._audioCtrl = ac;
+end
+
+function _module:DealCards()
+   self:ShowBacks(false);
+   self._dealing = true;
+   self._dealElapsed = 0.0;
+   self._dealPlayer = 1;
+   self._dealCard = 1;
+   self._dealInterval = 0.05;
+end
+
+function _module:ShowBacks(show)
+    for i = 1, 5 do
+        for j = 1, 5 do
+            if (self._backs[i][j] ~= nil) then
+                self._backs[i][j]:SetActive(show);
+            end
+        end
+    end
+end
+
+function _module.OnPathBack2End(idx)
+    local self = _module;
+	local tmp = math.floor(idx / 5);
+	local player = tmp + 1;
+	local card = idx - tmp * 5 + 1;
+    local Vector2 = CS.UnityEngine.Vector2;
+    local doTween = CS.NiuMa.LuaDOTween;
+	if (card > 1) then
+		local back = self._backs[player][card];
+		if (back == nil) then
+			return;
+		end
+		local rcTrans = back.transform;
+		local pos1 = rcTrans.anchoredPosition;
+		local pos2 = Vector2(pos1.x + 31 * (card - 1), pos1.y);
+		local tweener = doTween.DOAnchorPos(back, pos2, 0.1);
+		if (idx == 24) then
+			-- 最后一张牌
+            doTween.OnComplete(tweener, self.OnDealComplete);
+		end
+	end
+end
+
+function _module.OnDealComplete()
+	-- 发牌动画完成
+end
+
+function _module:ResetBacks()
+	for i = 1, 5 do
+		for j = 1, 5 do
+			if (self._cardPositions[i][j] ~= nil) then
+				local rcTrans = self._backs[i][j].transform;
+				rcTrans.anchoredPosition = self._cardPositions[i][j];
+			end
+		end
+	end
+end
+
+function _module:ShowGenres(show)
+    for i = 1, 5 do
+        if (self._genres[i] ~= nil) then
+            self._genres[i]:SetActive(show);
+        end
+    end
+end
+
+function _module:ResetGenres(playAnim)
+    self:ClearCards();
+    self:ClearGenreTypes();
+    local ui = CS.NiuMa.LuaUGUI;
+    for i = 1, 5 do
+        if (playAnim and (self._genres[i] ~= nil)) then
+            local animator = self._genres[i]:GetComponent("Animator");
+            if (animator ~= nil) then
+                animator:Play("Default");
+            end
+        end
+        if (self._genreMultiples[i] ~= nil) then
+            ui.SetText(self._genreMultiples[i], "");
+        end
+        if (self._genreScores[i] ~= nil) then
+            ui.SetText(self._genreScores[i], "");
+        end
+    end
+end
+
+function _module:ClearCards()
+    if (self._cards == nil) then
+        return;
+    end
+    local GameObject = CS.UnityEngine.GameObject;
+    local nums = #(self._cards);
+    for i = 1, nums do
+        GameObject.Destroy(self._cards[i]);
+    end
+    self._cards = {};
+end
+
+function _module:ClearGenreTypes()
+    if (self._genreTypes == nil) then
+        return;
+    end
+    local GameObject = CS.UnityEngine.GameObject;
+    local nums = #(self._genreTypes);
+    for i = 1, nums do
+        GameObject.Destroy(self._genreTypes[i]);
+    end
+    self._genreTypes = {};
+end
+
+function _module:ShowGenre1(idx, cards)
+    if (idx < 1 or idx > 5) then
+        return;
+    end
+    local nums = #cards;
+    if (nums > 5) then
+        nums = 5;
+    end
+    if (self._pokerPrefabs == nil) then
+        self._pokerPrefabs = {};
+    end
+    if (self._cards == nil) then
+        self._cards = {};
+    end
+    local point = 0;
+    local suit = 0;
+    local prefab = nil;
+    local prefabName = "";
+    local rm = CS.NiuMa.ResourceManager.Instance;
+    local Vector3 = CS.UnityEngine.Vector3;
+    local GameObject = CS.UnityEngine.GameObject;
+    for i = 1, nums do
+        local point = cards[i].point;
+        local suit = cards[i].suit;
+        prefabName = Poker.PokerPrefab(point, suit);
+        prefab = self._pokerPrefabs[prefabName];
+        if (prefab == nil) then
+            prefab = rm:LoadResource(prefabName, "prefabs/pokers.ab", "Assets/NiuMa/Resources/", ".prefab");
+            if (prefab ~= nil) then
+                self._pokerPrefabs[prefabName] = prefab;
+            end
+        end
+        if (prefab ~= nil and (self._cardParents[idx][i] ~= nil)) then
+            local obj = GameObject.Instantiate(prefab, self._cardParents[idx][i]);
+            if (obj ~= nil) then
+                table.insert(self._cards, obj);
+                obj.transform.localScale = Vector3(0.6, 0.6, 1.0);
+            end
+        end
+    end
+    if (self._genres[idx] ~= nil) then
+        local animator = self._genres[idx]:GetComponent("Animator");
+        if (animator ~= nil) then
+            animator:SetTrigger("ShowCard1");
+        end
+    end
+end
+
+function _module:ShowGenre2(idx)
+    if (self._genres[idx] ~= nil) then
+        local animator = self._genres[idx]:GetComponent("Animator");
+        if (animator ~= nil) then
+            animator:SetTrigger("ShowCard2");
+        end
+    end
+end
+
+function _module.NiuNiuGenrePrefab(genreType)
+    local prefabName = "";
+    if (genreType == pok_def.NiuNiuGenre.Niu0) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/Niu0";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu1) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/Niu1";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu2) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/Niu2";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu3) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/Niu3";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu4) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/Niu4";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu5) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/Niu5";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu6) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/Niu6";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu7) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/Niu7";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu8) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/Niu8";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu9) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/Niu9";
+    elseif (genreType == pok_def.NiuNiuGenre.NiuNiu) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/NiuNiu";
+    elseif (genreType == pok_def.NiuNiuGenre.ZhaDan) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/Bomb";
+    elseif (genreType == pok_def.NiuNiuGenre.WuHua) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/WuHua";
+    end
+    return prefabName;
+end
+
+function _module.GenreTypeSound(genreType)
+	local clipName = "";
+	if (genreType == pok_def.NiuNiuGenre.Niu0) then
+        clipName = "Sounds/Game/NiuNiu100/card/cow0";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu1) then
+        clipName = "Sounds/Game/NiuNiu100/card/cow1";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu2) then
+        clipName = "Sounds/Game/NiuNiu100/card/cow2";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu3) then
+        clipName = "Sounds/Game/NiuNiu100/card/cow3";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu4) then
+        clipName = "Sounds/Game/NiuNiu100/card/cow4";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu5) then
+        clipName = "Sounds/Game/NiuNiu100/card/cow5";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu6) then
+        clipName = "Sounds/Game/NiuNiu100/card/cow6";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu7) then
+        clipName = "Sounds/Game/NiuNiu100/card/cow7";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu8) then
+        clipName = "Sounds/Game/NiuNiu100/card/cow8";
+    elseif (genreType == pok_def.NiuNiuGenre.Niu9) then
+        clipName = "Sounds/Game/NiuNiu100/card/cow9";
+    elseif (genreType == pok_def.NiuNiuGenre.NiuNiu) then
+        clipName = "Sounds/Game/NiuNiu100/card/cow10";
+    end
+    return clipName;
+end
+
+function _module:ShowGenreType(idx, genreType, bet, mul, score)
+    if (self._genres[idx] == nil) then
+        return;
+    end
+    -- print("Genre type:"..genreType);
+    local prefabName = "";
+	local clipName = "";
+    if (not self._demoTable and idx > 1 and not bet) then
+        prefabName = "Prefabs/Game/NiuNiu100/Genre/None";
+    else
+        prefabName = self.NiuNiuGenrePrefab(genreType);
+		clipName = self.GenreTypeSound(genreType);
+    end
+    if (#prefabName > 0) then
+        if (self._genreTypes == nil) then
+            self._genreTypes = {};
+        end
+        if (self._genrePrefabs == nil) then
+            self._genrePrefabs = {};
+        end
+        local prefab = self._genrePrefabs[prefabName];
+        if (prefab == nil) then
+            prefab = CS.NiuMa.ResourceManager.Instance:LoadResource(prefabName, "prefabs/niuniu100_genres.ab", "Assets/NiuMa/Resources/", ".prefab");
+            if (prefab ~= nil) then
+                self._genrePrefabs[prefabName] = prefab;
+            end
+        end
+        if (prefab ~= nil) then
+            local obj = CS.UnityEngine.GameObject.Instantiate(prefab, self._genres[idx].transform);
+            if (obj ~= nil) then
+                table.insert(self._genreTypes, obj);
+            end
+			if (#clipName > 0) then
+				if (self._audioCtrl ~= nil) then
+					self._audioCtrl:GameClip(clipName);
+				end
+			end
+        end
+    end
+    if (bet) then
+        local ui = CS.NiuMa.LuaUGUI;
+        if (self._genreMultiples[idx] ~= nil) then
+            local multiple = mul;
+            if (multiple < 0) then
+                multiple = multiple * -1;
+            end
+            ui.SetText(self._genreMultiples[idx], "X" .. multiple);
+        end
+        if (self._genreScores[idx] ~= nil) then
+            if (score > 0) then
+                ui.SetText(self._genreScores[idx], "+" .. tostring(score));
+            else
+                ui.SetText(self._genreScores[idx], tostring(score));
+            end
+        end
+    end
+end
+
+return _module;

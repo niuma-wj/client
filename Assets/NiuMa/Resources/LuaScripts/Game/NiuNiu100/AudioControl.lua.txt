@@ -1,0 +1,79 @@
+-- 描述：百人牛牛声音控制脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.19
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("SoundGame");
+    if (child ~= nil) then
+        self._soundGame = child.gameObject:GetComponent("AudioSource");
+    end
+    self._soundPlayers = {};
+    for i = 1, 8 do
+        child = obj.transform:Find("SoundPlayer" .. i);
+        if (child ~= nil) then
+            self._soundPlayers[i] = child.gameObject:GetComponent("AudioSource");
+        end
+    end
+end
+
+function _module:Start()
+    local bgMusic = CS.NiuMa.AudioManager.Instance.BackgroundMusic;
+    if (bgMusic == nil) then
+        return ;
+    end
+    local resName = "Sounds/Game/NiuNiu100/bg";
+    local audioClip = CS.NiuMa.ResourceManager.Instance:LoadResource(resName, "sounds/niuniu100.ab", "Assets/NiuMa/Resources/", ".mp3");
+    if (audioClip ~= nil) then
+        bgMusic.clip = audioClip;
+        bgMusic:Play();
+    end
+end
+
+function _module:GameClip(clipName)
+    if (self._soundGame == nil) then
+        return;
+    end
+    if (self._audioClips == nil) then
+        self._audioClips = {};
+    end
+    local audioClip = self._audioClips[clipName];
+    if (audioClip == nil) then
+        -- local resName = "Sounds/Game/NiuNiu100/show";
+        audioClip = CS.NiuMa.ResourceManager.Instance:LoadResource(clipName, "sounds/niuniu100.ab", "Assets/NiuMa/Resources/", ".mp3");
+        if (audioClip ~= nil) then
+            self._audioClips[clipName] = audioClip;
+        end
+    end
+    if (audioClip ~= nil) then
+        self._soundGame.clip = audioClip;
+        self._soundGame:Play();
+    end
+end
+
+function _module:PlayerClip(clipName, seat)
+    if (self._soundPlayers[seat] == nil) then
+        return;
+    end
+    if (self._audioClips == nil) then
+        self._audioClips = {};
+    end
+    local audioClip = self._audioClips[clipName];
+    if (audioClip == nil) then
+        audioClip = CS.NiuMa.ResourceManager.Instance:LoadResource(clipName, "sounds/niuniu100.ab", "Assets/NiuMa/Resources/", ".mp3");
+        if (audioClip ~= nil) then
+            self._audioClips[clipName] = audioClip;
+        end
+    end
+    if (audioClip ~= nil) then
+        self._soundPlayers[seat].clip = audioClip;
+        self._soundPlayers[seat]:Play();
+    end
+end
+
+return _module;

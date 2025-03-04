@@ -1,0 +1,128 @@
+-- 描述：比鸡大厅界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.26
+
+local base = require 'BehaviourBase';
+local RoomList = require "Game.BiJi.RoomList";
+local DlgCreateRoom = require "Game.BiJi.DlgCreateRoom";
+local DlgJoinRoom = require 'Hall.DlgJoinRoom';
+local com_def = require 'Common.Defines';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("RoomList");
+    if (child ~= nil) then
+        RoomList.gameObject = child.gameObject;
+        RoomList:Awake();
+        self._roomList = RoomList;
+    end
+    local child = obj.transform:Find("EmptyTip");
+    if (child ~= nil) then
+        self._emptyTip = child.gameObject;
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    child = obj.transform:Find("BtnBack");
+    if (child ~= nil) then
+        ui.AddBtnClick(child.gameObject, self.OnBackClick);
+    end
+    child = obj.transform:Find("BtnCreate");
+    if (child ~= nil) then
+        ui.AddBtnClick(child.gameObject, self.OnCreateClick);
+    end
+    child = obj.transform:Find("BtnJoin");
+    if (child ~= nil) then
+        ui.AddBtnClick(child.gameObject, self.OnJoinClick);
+    end
+    child = obj.transform:Find("BtnRefresh");
+    if (child ~= nil) then
+        ui.AddBtnClick(child.gameObject, self.OnRefreshClick);
+    end
+    child = obj.transform:Find("DlgCreate");
+    if (child ~= nil) then
+        DlgCreateRoom.gameObject = child.gameObject;
+        DlgCreateRoom:Awake();
+        self._dlgCreateRoom = DlgCreateRoom;
+    end
+    child = obj.transform:Find("DlgJoin");
+    if (child ~= nil) then
+        DlgJoinRoom.gameObject = child.gameObject;
+        DlgJoinRoom:Awake();
+        DlgJoinRoom:SetEnterCallback(self.OnEnterVenue);
+        self._dlgJoinRoom = DlgJoinRoom;
+        self._dlgJoinRoom:SetGameType(com_def.GameType.LiuAnBiJi);
+    end
+end
+
+function _module:Start()
+    if (self._dlgCreateRoom ~= nil) then
+        self._dlgCreateRoom:SetHall(self);
+    end
+    if (self._roomList ~= nil) then
+        self._roomList:SetEmptyTip(self._emptyTip);
+        self._roomList:SetEnterCallback(self.OnEnterVenue);
+        self._roomList:Start();
+    end
+end
+
+function _module:Update()
+end
+
+function _module.OnBackClick()
+	CS.NiuMa.GameManager.Instance:DestroyGameHall();
+end
+
+function _module.OnCreateClick()
+    local self = _module;
+    if (self._dlgCreateRoom ~= nil) then
+        self._dlgCreateRoom:Show(true);
+    end
+end
+
+function _module.OnJoinClick()
+    local self = _module;
+    if (self._dlgJoinRoom ~= nil) then
+        self._dlgJoinRoom:Show(true);
+    end
+end
+
+function _module.OnRefreshClick()
+    local self = _module;
+    self._roomList:RefreshList();
+end
+
+function _module.OnCreateResponse(code, text)
+	local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code ~= 200) then
+		--创建失败
+		local err;
+        if (t.msg ~= nil) then
+            err = t.msg;
+        else
+            err = text;
+        end
+        gm:ShowPromptDialog("创建房间失败：" .. err);
+	else
+		--创建成功，直接进入
+		gm:EnterVenue(t.address, t.venueId, com_def.GameType.LiuAnBiJi, self.OnEnterVenue);
+	end
+end
+
+function _module.OnEnterVenue()
+	local gm = CS.NiuMa.GameManager.Instance;
+	local room = gm:GetGameRoom();
+	if (room ~= nil) then
+		return;
+	end
+	local prefab = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/BiJi/Room", "prefabs/biji.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (prefab ~= nil) then
+		gm:CreateHallRoom("BiJi-Room", prefab, false);
+	end
+end
+
+return _module;

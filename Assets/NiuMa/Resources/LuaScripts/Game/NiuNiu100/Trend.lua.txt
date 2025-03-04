@@ -1,0 +1,84 @@
+-- 描述：百人牛牛趋势界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.19
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Frame");
+    local child1 = nil;
+    local child2 = nil;
+    self._rounds = {};
+    self._icons = {};
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+        child1 = child:Find("BtnClose");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnCloseClick);
+        end
+        for i = 1, 7 do
+            child1 = child:Find("Round"..i);
+            if (child1 ~= nil) then
+                self._icons[i] = {};
+                self._rounds[i] = child1.gameObject;
+                for j = 1, 4 do
+                    child2 = child1:Find("Icon"..j);
+                    if (child2 ~= nil) then
+                        self._icons[i][j] = child2.gameObject;
+                    end
+                end
+            end
+        end
+    end
+end
+
+function _module:Start()
+    local list = self.gameObject:GetComponent("SpriteList");
+    if (list ~= nil) then
+        self._winIcon = list:GetSprite(0);
+        self._loseIcon = list:GetSprite(1);
+    end
+    for i = 1, 7 do
+        if (self._rounds[i] ~= nil) then
+            self._rounds[i]:SetActive(false);
+        end
+    end
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+    self:Show(false);
+end
+
+function _module:OnTrend(msg)
+    local nums = #(msg.trends);
+    local bits = { 0x1, 0x2, 0x4, 0x8 };
+    local util = CS.NiuMa.Utility;
+    local ui = CS.NiuMa.LuaUGUI;
+    for i = 1, nums do
+        if (self._rounds[i] ~= nil) then
+            self._rounds[i]:SetActive(true);
+        end
+        if (self._icons[i] ~= nil) then
+            for j = 1, 4 do
+                local ret = util.BitwiseAnd(msg.trends[i], bits[j]);
+                if (ret ~= 0) then
+                    ui.SetImage(self._icons[i][j], self._winIcon);
+                else
+                    ui.SetImage(self._icons[i][j], self._loseIcon);
+                end
+            end
+        end
+    end
+end
+
+return _module;

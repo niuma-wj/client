@@ -1,0 +1,104 @@
+-- 描述：逮狗腿设置对话框脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.19
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child = obj.transform:Find("Frame/Title/BtnClose");
+    local child1 = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnCloseClick);
+	end
+    child = obj.transform:Find("Frame/Bottom");
+	if (child ~= nil) then
+        child1 = child:Find("CheckVoice");
+        if (child1 ~= nil) then
+            self._checkVoice = child1.gameObject;
+            ui.AddToggleClick(child1.gameObject, self.OnVoiceCheck);
+        end
+        self._tables = {};
+        for i = 1, 3 do
+            child1 = child:Find("Tables/Table" .. i);
+            if (child1 ~= nil) then
+                table.insert(self._tables, child1.gameObject);
+                local funcName = "OnTable"..i.."Changed";
+                ui.AddToggleClick(child1.gameObject, self[funcName]);
+            end
+        end
+    end
+    self._voiceOn = true;
+end
+
+function _module:Start()
+    local ui = CS.NiuMa.LuaUGUI;
+    local PlayerPrefs = CS.UnityEngine.PlayerPrefs;
+    local hasKey = PlayerPrefs.HasKey("voice_on");
+    if (hasKey) then
+        local voiceOn = UnityEngine.PlayerPrefs.GetInt("voice_on");
+        self._voiceOn = (voiceOn ~= 0);
+        if ((self._checkVoice ~= nil) and (voiceOn == 0)) then
+            ui.SetToggleOn(self._checkVoice, false);
+        end
+    end
+    hasKey = PlayerPrefs.HasKey("table_sel");
+    if (hasKey) then
+        local idx = PlayerPrefs.GetInt("table_sel");
+        if (self._tables[idx] ~= nil and idx ~= 3) then
+            ui.SetToggleOn(self._tables[idx], true);
+        end
+    end
+    self.gameObject:SetActive(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+	self.gameObject:SetActive(false);
+end
+
+function _module.OnVoiceCheck(val)
+    local self = _module;
+    self._voiceOn = val;
+    local PlayerPrefs = CS.UnityEngine.PlayerPrefs;
+    if (val) then
+        PlayerPrefs.SetInt("voice_on", 1);
+    else
+        PlayerPrefs.SetInt("voice_on", 0);
+    end
+end
+
+function _module:IsVoiceOn()
+    return self._voiceOn;
+end
+
+function _module.OnTable1Changed(val)
+    if (not val) then
+        return;
+    end
+    CS.UnityEngine.PlayerPrefs.SetInt("table_sel", 1);
+end
+
+function _module.OnTable2Changed(val)
+    if (not val) then
+        return;
+    end
+    CS.UnityEngine.PlayerPrefs.SetInt("table_sel", 2);
+end
+
+function _module.OnTable3Changed(val)
+    if (not val) then
+        return;
+    end
+    CS.UnityEngine.PlayerPrefs.SetInt("table_sel", 3);
+end
+
+return _module;

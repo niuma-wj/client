@@ -1,0 +1,312 @@
+-- 描述：比对结果界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.28
+
+local base = require 'BehaviourBase';
+local Poker = require 'Common.Poker';
+local pok_def = require 'Common.PokerDefines';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local trans = obj.transform;
+	local child = nil;
+	local child1 = nil;
+	self._backs = {};
+    for i = 1, 3 do
+        self._backs[i] = {};
+        for j = 1, 3 do
+            child = trans:Find("Back" .. i .. j);
+            if (child ~= nil) then
+                self._backs[i][j] = child.gameObject;
+            end
+        end
+    end
+	self._cards = {};
+	for i = 1, 3 do
+        self._cards[i] = {};
+        for j = 1, 3 do
+            child = trans:Find("Card" .. i .. j);
+            if (child ~= nil) then
+                self._cards[i][j] = child.gameObject;
+            end
+        end
+    end
+    self._rewards = {};
+    for i = 1, 4 do
+	    child = trans:Find("Reward" .. i);
+	    if (child ~= nil) then
+            self._rewards[i] = child.gameObject;
+        end
+    end
+	self._genres = {};
+	for i = 1, 3 do
+		child = trans:Find("Genre" .. i);
+		if (child ~= nil) then
+			self._genres[i] = child.gameObject;
+		end
+	end
+	self._scores = {};
+	self._textWins = {};
+	self._textLoses = {};
+	for i = 1, 5 do
+		child = trans:Find("Score" .. i);
+		if (child ~= nil) then
+			self._scores[i] = child.gameObject;
+			child1 = child:Find("TextWin");
+			if (child1 ~= nil) then
+				self._textWins[i] = child1.gameObject;
+			end
+			child1 = child:Find("TextLose");
+			if (child1 ~= nil) then
+				self._textLoses[i] = child1.gameObject;
+			end
+		end
+	end
+	self._cardObjs = {};
+	for i = 1, 3 do
+        self._cardObjs[i] = {};
+	end
+    return inst;
+end
+
+function _module:Start()
+	self._sprites = {};
+	local sl = self.gameObject:GetComponent("SpriteList");
+	for i = 0, 15 do
+		table.insert(self._sprites, sl:GetSprite(i));
+	end
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetRoom(r)
+	self._room = r;
+end
+
+function _module:ShowBacks(s)
+	for i = 1, 3 do
+		for j = 1, 3 do
+			if (self._backs[i][j] ~= nil) then
+				self._backs[i][j]:SetActive(s);
+			end
+		end
+	end
+end
+
+function _module:SetQiPai(s)
+	if (self._qiPai and s) then
+		return;
+	end
+	if (not self._qiPai and not s) then
+		return;
+	end
+	self._qiPai = s;
+	local ui = CS.NiuMa.LuaUGUI;
+	for i = 1, 3 do
+		for j = 1, 3 do
+			if (self._backs[i][j] ~= nil) then
+				if (s) then
+					ui.SetImage(self._backs[i][j], self._sprites[2], false);
+				else
+					ui.SetImage(self._backs[i][j], self._sprites[1], false);
+				end
+			end
+		end
+	end
+end
+
+function _module:ShowDunBacks(dun, s)
+	if (dun < 1 or dun > 3) then
+		return;
+	end
+	for i = 1, 3 do
+		if (self._backs[dun][i] ~= nil) then
+			self._backs[dun][i]:SetActive(s);
+		end
+	end
+end
+
+function _module:ClearCardObjects()
+	local GameObject = CS.UnityEngine.GameObject;
+	for i = 1, 3 do
+		for j = 1, 3 do
+			if (self._cardObjs[i][j] ~= nil) then
+				GameObject.Destroy(self._cardObjs[i][j]);
+				self._cardObjs[i][j] = nil;
+			end
+		end
+	end
+end
+
+function _module:ResetResult()
+	self:ClearCardObjects();
+    for i = 1, 4 do
+	    if (self._rewards[i] ~= nil) then
+		    self._rewards[i]:SetActive(false);
+	    end
+    end
+	for i = 1, 3 do
+		if (self._genres[i] ~= nil) then
+			self._genres[i]:SetActive(false);
+		end
+	end
+	for i = 1, 5 do
+		if (self._scores[i] ~= nil) then
+			self._scores[i]:SetActive(false);
+		end
+	end
+end
+
+function _module:SetCardObject(i, j, obj)
+	if (i < 1 or i > 3 or j < 1 or j > 3) then
+		return;
+	end
+	if (obj == nil) then
+		return;
+	end
+	self._cardObjs[i][j] = obj;
+	obj.transform:SetParent(self._cards[i][j].transform, false);
+end
+
+function _module:GetGenreSprite(genre)
+	if (pok_def.BiJiGenre.Triple == genre) then
+		return self._sprites[3];
+	elseif (pok_def.BiJiGenre.FlushStraight == genre) then
+		return self._sprites[4];
+	elseif (pok_def.BiJiGenre.Flush == genre) then
+		return self._sprites[5];
+	elseif (pok_def.BiJiGenre.Straight == genre) then
+		return self._sprites[6];
+	elseif (pok_def.BiJiGenre.Pair == genre) then
+		return self._sprites[7];
+	elseif (pok_def.BiJiGenre.Single == genre) then
+		return self._sprites[8];
+	end
+	return nil;
+end
+
+function _module:GetRewardSprite(rewardType)
+	local util = CS.NiuMa.Utility;
+    if (util.BitwiseAndEqual(rewardType, pok_def.BiJiRewardType.TongGuan)) then
+        return self._sprites[9];
+    end
+    if (util.BitwiseAndEqual(rewardType, pok_def.BiJiRewardType.QuanSanTiao)) then
+        return self._sprites[10];
+    end
+    if (util.BitwiseAndEqual(rewardType, pok_def.BiJiRewardType.QuanShuanZi)) then
+        return self._sprites[11];
+    end
+    if (util.BitwiseAndEqual(rewardType, pok_def.BiJiRewardType.QuanHeiSe)) then
+        return self._sprites[14];
+    end
+    if (util.BitwiseAndEqual(rewardType, pok_def.BiJiRewardType.QuanHongSe)) then
+        return self._sprites[15];
+    end
+    if (util.BitwiseAndEqual(rewardType, pok_def.BiJiRewardType.ShuangTongHuaShun)) then
+        return self._sprites[13];
+    end
+    return nil;
+end
+
+function _module:SetResult(dun, result, animate, myself)
+	if (not myself and result.genre ~= pok_def.BiJiGenre.Invalid) then
+        -- 没有弃牌
+        self:ShowDunBacks(dun, false);
+		local prefab = nil;
+		local obj = nil;
+		local GameObject = CS.UnityEngine.GameObject;
+		local Vector2 = CS.UnityEngine.Vector2;
+		for i = 1, 3 do
+			local c = Poker.FromInt32Ex(result.cards[i]);
+			prefab = self._room:GetPokerPrefab(c);
+			if (prefab ~= nil) then
+				obj = GameObject.Instantiate(prefab, self._cards[dun][i].transform);
+				if (obj ~= nil) then
+					self._cardObjs[dun][i] = obj;
+					obj.transform.anchoredPosition = Vector2(0.0, 0.0);
+				end
+			end
+		end
+	end
+	local ui = CS.NiuMa.LuaUGUI;
+	if ((result.genre ~= pok_def.BiJiGenre.Invalid) and (self._genres[dun] ~= nil)) then
+        self._genres[dun]:SetActive(true);
+		local sp = self:GetGenreSprite(result.genre);
+		ui.SetImage(self._genres[dun], sp);
+	end
+	if (self._scores[dun] ~= nil) then
+		self._scores[dun]:SetActive(true);
+	end
+	if (self._textWins[dun] ~= nil) then
+		self._textWins[dun]:SetActive(result.score >= 0);
+		if (result.score >= 0) then
+			ui.SetText(self._textWins[dun], "+" .. tostring(result.score));
+		end
+	end
+	if (self._textLoses[dun] ~= nil) then
+		self._textLoses[dun]:SetActive(result.score < 0);
+		if (result.score < 0) then
+			ui.SetText(self._textLoses[dun], tostring(result.score));
+		end
+	end
+end
+
+function _module:SetScore(score, animate)
+    local tmps = {};
+    table.insert(tmps, score.reward);
+    table.insert(tmps, score.total);
+	local ui = CS.NiuMa.LuaUGUI;
+    for i = 1, 2 do
+        if (self._scores[3 + i] ~= nil) then
+		    self._scores[3 + i]:SetActive(true);
+	    end
+	    if (self._textWins[3 + i] ~= nil) then
+		    self._textWins[3 + i]:SetActive(tmps[i] >= 0);
+		    if (tmps[i] >= 0) then
+			    ui.SetText(self._textWins[3 + i], "+" .. tostring(tmps[i]));
+		    end
+	    end
+	    if (self._textLoses[3 + i] ~= nil) then
+		    self._textLoses[3 + i]:SetActive(tmps[i] < 0);
+		    if (tmps[i] < 0) then
+			    ui.SetText(self._textLoses[3 + i], tostring(tmps[i]));
+		    end
+	    end
+    end
+    local rewardTypes =
+    {
+        pok_def.BiJiRewardType.TongGuan,
+        pok_def.BiJiRewardType.QuanSanTiao,
+        pok_def.BiJiRewardType.QuanShuanZi,
+        pok_def.BiJiRewardType.QuanHeiSe,
+        pok_def.BiJiRewardType.QuanHongSe,
+        pok_def.BiJiRewardType.ShuangTongHuaShun
+    };
+    local nums = 1;
+	local util = CS.NiuMa.Utility;
+    for i = 1, 6 do
+        if ((self._rewards[nums] ~= nil) and util.BitwiseAndEqual(score.rewardType, rewardTypes[i])) then
+            local sp = self:GetRewardSprite(rewardTypes[i]);
+            if (sp ~= nil) then
+                self._rewards[nums]:SetActive(true);
+                ui.SetImage(self._rewards[nums], sp);
+                nums = nums + 1;
+            end
+        end
+        if (nums >= 4) then
+            break;
+        end
+    end
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

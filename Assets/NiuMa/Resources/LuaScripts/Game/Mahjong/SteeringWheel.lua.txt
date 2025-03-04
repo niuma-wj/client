@@ -1,0 +1,95 @@
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child = nil;
+	self._arrows = {};
+	for i = 1, 4 do
+		child = obj.transform:Find("Arrow0"..i);
+		if (child ~= nil) then
+			self._arrows[i] = child.gameObject;
+		end
+	end
+	child = obj.transform:Find("TextCountDown");
+	if (child ~= nil) then
+		self._textCountdown = child.gameObject;
+	end
+	self._show = false;
+	self._second = 0.0;
+end
+
+function _module:Start()
+end
+
+function _module:Update()
+	if (not self._show or not self._countdown) then
+		return;
+	end
+	self._second = self._second - CS.UnityEngine.Time.unscaledDeltaTime;
+	if (self._second < 0) then
+		self:EndCountdown();
+		self:StartAlert();
+	else
+		local sec = math.floor(self._second);
+		if (self._textCountdown ~= nil) then
+			CS.NiuMa.LuaUGUI.SetText(self._textCountdown, tostring(sec));
+		end
+	end
+end
+
+function _module:SetAudioCtrl(ac)
+	self._audioCtrl = ac;
+end
+
+function _module:Countdown(sec, alert)
+	self._second = sec + 0.5;
+	self._countdown = true;
+	self._alert = alert;
+end
+
+function _module:EndCountdown()
+	self._second = 0.0;
+	self._countdown = false;
+	if (self._textCountdown ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textCountdown, "");
+	end
+end
+
+function _module:StartAlert()
+	print("StartAlert:" .. tostring(self._alert));
+	if (not self._alert) then
+		return;
+	end
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:PlayAlert(true);
+	end
+end
+
+function _module:StopAlert()
+	self._alert = false;
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:PlayAlert(false);
+	end
+end
+
+function _module:Reset()
+	self:EndCountdown();
+	self:Show(false);
+end
+
+function _module:SetArrow(clientSeat)
+	for i = 1, 4 do
+		if (self._arrows[i] ~= nil) then
+			self._arrows[i]:SetActive(i == clientSeat);
+		end
+	end
+end
+
+function _module:Show(show)
+	self._show = show;
+	self.gameObject:SetActive(show);
+end
+
+return _module;

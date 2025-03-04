@@ -1,0 +1,54 @@
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Tile");
+    if (child ~= nil) then
+        self._tile = child.gameObject;
+    end
+    CS.NiuMa.LuaUGUI.AddBtnClick(inst, obj, self:OnActionClick());
+end
+
+function _module:SetActionOption(ao)
+    self._actionOption = ao;
+end
+
+function _module:SetActionOptionID(id)
+    self._actionOptionID = id;
+end
+
+function _module:SetMahjongSprites(obj)
+    self._mahjongSprites = obj;
+end
+
+function _module:SetTile(tile)
+    if (self._tile == nil) then
+        return;
+    end
+    local mb = self._tile:GetComponent("MahjongBrick");
+	if (mb ~= nil) then
+		mb:SetMahjongSprites(self._mahjongSprites);
+		mb:SetMahjongTile(tile.pattern, tile.number, 0);
+	end
+end
+
+function _module:OnActionClick()
+    local inst = self;
+    return function()
+        local self = inst;
+        if (self._actionOption ~= nil) then
+            self._actionOption:OnActionClick(self._actionOptionID);
+        end
+    end
+end
+
+--因为ActionOptionGang被多个地方引用到，而每个引用的地方必须有独立的ActionOptionGang实例，因此外部不能直接引用_module，
+--而是调用NewInstance函数创建实例
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

@@ -1,0 +1,55 @@
+-- 描述：赌注脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.10.25
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("Text");
+    if (child ~= nil) then
+        self._textAmount = child.gameObject;
+    end
+end
+
+function _module:SetOwner(owner)
+	self._owner = owner;
+end
+
+function _module:SetImage(sprite)
+	CS.NiuMa.LuaUGUI.SetImage(self.gameObject, sprite);
+end
+
+function _module:SetAmount(amount)
+    if (self._textAmount ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textAmount, tostring(amount));
+    end
+end
+
+function _module:OnThrowComplete()
+    local inst = self;
+    return function()
+        local self = inst;
+	    if (self._owner ~= nil) then
+		    self._owner:OnMoveChipEnd(self.gameObject);
+	    end
+    end
+end
+
+function _module:OnBackComplete()
+    local inst = self;
+    return function()
+        local self = inst;
+	    CS.UnityEngine.GameObject.Destroy(self.gameObject);
+    end
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

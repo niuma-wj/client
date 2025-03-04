@@ -1,0 +1,17 @@
+-- 描述：LuaBehaviour基类模块
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.10.25
+
+local _module = {
+	Awake = function(self)
+	end,
+	Start = function(self)
+	end,
+	Update = function(self)
+	end,
+	OnDestroy = function(self)
+	end
+};
+
+return _module;

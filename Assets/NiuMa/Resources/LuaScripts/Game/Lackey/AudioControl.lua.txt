@@ -1,0 +1,314 @@
+-- 描述：逮狗腿音频控制脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.07
+
+local base = require 'BehaviourBase';
+local pok_def = require 'Common.PokerDefines';
+local poker = require 'Common.Poker';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	self.gameObject = obj;
+	self._games = {};
+    self._phrases = {};
+    local child = nil;
+	for i = 1, 5 do
+		child = obj.transform:Find("Game" .. i);
+		if (child ~= nil) then
+			table.insert(self._games, child.gameObject:GetComponent("AudioSource"));
+		end
+        child = obj.transform:Find("Phrase" .. i);
+		if (child ~= nil) then
+			table.insert(self._phrases, child.gameObject:GetComponent("AudioSource"));
+		end
+	end
+	child = obj.transform:Find("Share");
+	if (child ~= nil) then
+		self._share = child.gameObject:GetComponent("AudioSource");
+	end
+    child = obj.transform:Find("Loop");
+	if (child ~= nil) then
+		self._loop = child.gameObject:GetComponent("AudioSource");
+	end
+    self._looping = false;      -- 当前是否正在播放循环音效
+    self._loopTime = 0.0;       -- 循环音效剩余时间
+end
+
+function _module:Start()
+    local bgMusic = CS.NiuMa.AudioManager.Instance.BackgroundMusic;
+    if (bgMusic == nil) then
+        return ;
+    end
+    local resName = "Sounds/Game/Lackey/Game/bg";
+    local audioClip = CS.NiuMa.ResourceManager.Instance:LoadResource(resName, "sounds/lackey.ab", "Assets/NiuMa/Resources/", ".mp3");
+    if (audioClip ~= nil) then
+        bgMusic.clip = audioClip;
+        bgMusic:Play();
+    end
+end
+
+function _module:Update()
+    local Time = CS.UnityEngine.Time;
+    if (self._dealing) then
+        self._dealElapsed = self._dealElapsed + Time.unscaledDeltaTime;
+        if (self._dealElapsed > 0.5) then
+            self._dealing = false;
+            self:PlayDeal();
+        end
+    end
+	if (self._looping) then
+		self._loopTime = self._loopTime - Time.unscaledDeltaTime;
+	    if (self._loopTime <= 0.0) then
+            self._looping = false;
+            if (self._loop ~= nil) then
+                self._loop:Stop();
+            end
+        end
+	end
+end
+
+function _module:GetAudioClip(resName, ext)
+	if (self._audioClips == nil) then
+		self._audioClips = {};
+	end
+	local clip = self._audioClips[resName];
+	local tmp = ext;
+	if (tmp == nil) then
+		tmp = ".mp3";
+	end
+	if (clip == nil) then
+		clip = CS.NiuMa.ResourceManager.Instance:LoadResource(resName, "sounds/lackey.ab", "Assets/NiuMa/Resources/", tmp);
+		if (clip ~= nil) then
+			self._audioClips[resName] = clip;
+		end
+	end
+	return clip;
+end
+
+function _module:PlayStart()
+    if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+		return;
+	end
+    local resName = "Sounds/Game/Lackey/Game/gamestart";
+    local clip = self:GetAudioClip(resName);
+    if (clip ~= nil and self._share ~= nil) then
+        self._share.clip = clip;
+        self._share:Play();
+    end
+    self._dealing = true;
+    self._dealElapsed = 0.0;
+end
+
+function _module:PlayDeal()
+    local resName = "Sounds/Game/Lackey/Game/dealcard";
+    local clip = self:GetAudioClip(resName, ".ogg");
+    if (clip ~= nil and self._loop ~= nil) then
+        self._loop.clip = clip;
+        self._loop:Play();
+        self._looping = true;
+        self._loopTime = 1;
+    end
+end
+
+function _module:PlayGenre(male, genre, card, clientSeat, last)
+	if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+	if (self._games[clientSeat] == nil) then
+		return;
+	end
+    local yaPai = false;
+    if (clientSeat ~= last) then
+        local rand = CS.NiuMa.Utility.RandFloat();
+        if (rand < 0.12) then
+            yaPai = true;
+        end
+    end
+    local clipName = "";
+    if (yaPai) then
+        clipName = "yapai";
+    else
+        if (genre == 1 or genre == 2) then
+            local point = card.point;
+            local suit = card.suit;
+            if (pok_def.PokerPoint.Ace == point) then
+                clipName = string.format("%d_14", genre);
+            elseif (pok_def.PokerPoint.Joker == point) then
+                if (pok_def.PokerSuit.Little == suit) then
+                    clipName = string.format("%d_15", genre);
+                else
+                    clipName = string.format("%d_16", genre);
+                end
+            else
+                clipName = string.format("%d_%d", genre, point);
+            end
+        elseif (genre > 2 and genre < 13) then
+            -- 连对
+            clipName = "liandui";
+        elseif (genre == 13) then
+            -- 3张
+            clipName = "sanzhang";
+        elseif (genre > 13 and genre < 25) then
+            -- 3顺
+            clipName = "shunzi";
+        elseif (genre == 25) then
+            -- 3张
+            clipName = "sandaier";
+        elseif (genre > 25 and genre < 32) then
+            -- 蝴蝶
+            clipName = "butterfly";
+        elseif (genre > 31 and genre < 41) then
+            -- 炸弹
+            clipName = "zhadan";
+        elseif (genre > 40 and genre < 50) then
+            -- 王炸
+            clipName = "wangzha";
+        else
+            return;
+        end
+    end
+    local path = "";
+    if (male) then
+        path = "Sounds/Game/Lackey/Game/male/";
+    else
+        path = "Sounds/Game/Lackey/Game/female/";
+    end
+	clipName = path .. clipName;
+	local clip = self:GetAudioClip(clipName);
+	if (clip ~= nil) then
+		self._games[clientSeat].clip = clip;
+		self._games[clientSeat]:Play();
+	end
+end
+
+function _module:PlayPass(male, clientSeat)
+    print("PlayPass1");
+	if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+	if (self._games[clientSeat] == nil) then
+		return;
+	end
+    local clipName = "";
+    local rand = CS.NiuMa.Utility.RandFloat();
+    if (rand < 0.34) then
+        clipName = "pass1";
+    elseif (rand < 0.67) then
+        clipName = "pass2";
+    else
+        clipName = "pass3";
+    end
+    local path = "";
+    if (male) then
+        path = "Sounds/Game/Lackey/Game/male/";
+    else
+        path = "Sounds/Game/Lackey/Game/female/";
+    end
+    print("PlayPass2:" .. clipName);
+	clipName = path .. clipName;
+	local clip = self:GetAudioClip(clipName);
+	if (clip ~= nil) then
+        print("PlayPass3");
+		self._games[clientSeat].clip = clip;
+		self._games[clientSeat]:Play();
+	end
+end
+
+function _module:PlayLackey()
+    if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+	local resName = "Sounds/Game/Lackey/Game/card_goutui";
+    local clip = self:GetAudioClip(resName);
+    if (clip ~= nil and self._share ~= nil) then
+        self._share.clip = clip;
+        self._share:Play();
+    end
+end
+
+function _module:PlayAlert()
+	if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+	local resName = "Sounds/Game/Lackey/Game/warning";
+    local clip = self:GetAudioClip(resName);
+    if (clip ~= nil and self._share ~= nil) then
+        self._share.clip = clip;
+        self._share:Play();
+    end
+end
+
+function _module:PlayCountdown(cnt)
+    if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+    if (cnt < 0 or cnt > 5) then
+        return;
+    end
+    local clipName = string.format("Sounds/Game/Lackey/Game/clock/warning%d", cnt);
+    local clip = self:GetAudioClip(clipName);
+    if (clip ~= nil and self._games[1] ~= nil) then
+        self._games[1].clip = clip;
+        self._games[1]:Play();
+    end
+end
+
+function _module:PlayResult(winOrLose)
+    if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+    local clipName = "";
+    if (winOrLose == 1) then
+        clipName = "Sounds/Game/Lackey/Game/win";
+    else
+        clipName = "Sounds/Game/Lackey/Game/lose";
+    end
+    local clip = self:GetAudioClip(clipName);
+    if (clip ~= nil and self._share ~= nil) then
+        self._share.clip = clip;
+        self._share:Play();
+    end
+end
+
+function _module:PlayPhrase(male, clientSeat, phrase)
+    if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+    if (phrase < 1 or phrase > 13) then
+        return;
+    end
+    if (self._phrases[clientSeat] == nil) then
+        return;
+    end
+    local clipName = "";
+    if (male) then
+        clipName = string.format("Sounds/Game/Lackey/Phrase/male/%d", phrase);
+    else
+        clipName = string.format("Sounds/Game/Lackey/Phrase/female/%d", phrase);
+    end
+    local clip = self:GetAudioClip(clipName);
+    if (clip ~= nil) then
+        self._phrases[clientSeat].clip = clip;
+        self._phrases[clientSeat]:Play();
+    end
+end
+
+function _module:PlayProp(clientSeat, prop)
+    if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+    if (prop < 1 or prop > 5) then
+        return;
+    end
+    local clipName = string.format("Sounds/Game/Lackey/Prop/pro_%d", prop);
+    local clip = self:GetAudioClip(clipName);
+    if (clip ~= nil) then
+        self._games[clientSeat].clip = clip;
+        self._games[clientSeat]:Play();
+    end
+end
+
+return _module;

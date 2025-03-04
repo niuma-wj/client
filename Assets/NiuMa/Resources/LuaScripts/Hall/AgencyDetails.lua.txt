@@ -1,0 +1,172 @@
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    self._records = {};
+    self._textUserIDs = {};
+    self._textRewards = {};
+    self._textStates = {};
+    self._textTimes = {};
+    local obj = self.gameObject;
+    local child = obj.transform:Find("List/Content");
+    local child1 = nil;
+    local child2 = nil;
+    if (child ~= nil) then
+        for i = 1, 16 do
+            child1 = child:Find(string.format("Record%02d", i));
+            if (child1 ~= nil) then
+                self._records[i] = child1.gameObject;
+                child2 = child1:Find("TextUserID");
+                if (child2 ~= nil) then
+                    self._textUserIDs[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextReward");
+                if (child2 ~= nil) then
+                    self._textRewards[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextState");
+                if (child2 ~= nil) then
+                    self._textStates[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextTime");
+                if (child2 ~= nil) then
+                    self._textTimes[i] = child2.gameObject;
+                end
+            end
+        end
+    end
+    child = obj.transform:Find("Page");
+    if (child ~= nil) then
+        child1 = child:Find("BtnFront");
+        if (child1 ~= nil) then
+            CS.NiuMa.LuaUGUI.AddBtnClick(child1.gameObject, _module.OnFrontClick);
+        end
+        child1 = child:Find("BtnNext");
+        if (child1 ~= nil) then
+            CS.NiuMa.LuaUGUI.AddBtnClick(child1.gameObject, _module.OnNextClick);
+        end
+        child1 = child:Find("TextPage");
+        if (child1 ~= nil) then
+            self._textPage = child1.gameObject;
+        end
+    end
+    self._page = 1;
+    self._totalPage = 0;
+    -- 是否正在请求数据
+    self._requesting = false;
+end
+
+function _module:Update()
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+function _module.OnFrontClick()
+    local self = _module;
+    if (self._page == 1) then
+        --当前已经是第一页，不能再请求上一页
+        return;
+    end
+    self:RequestPage(self._page - 1);
+end
+
+function _module.OnNextClick()
+    local self = _module;
+    if (self._page >= self._totalPage) then
+        -- 当前已是最后一页不能再请求下一页
+        return;
+    end
+    self:RequestPage(self._page + 1);
+end
+
+-- 请求页面
+function _module:RequestPage(page)
+    if (self._requesting) then
+        -- 当前正在请求数据，但是数据还没有返回，直接退出
+        return;
+    end
+    local t = {};
+    t.pageNum = page;
+    --固定每页16条数据
+    t.pageSize = 16;
+    local body = rapidjson.encode(t);
+    CS.NiuMa.GameManager.Instance:AuthPost("/player/agency/reward", body, self.OnRequestRespone);
+    self._requesting = true;
+end
+
+-- 在转账成功后或者重新打开代理窗口后更新第一页
+function _module:UpdateFirstPage()
+    if (self._page == 1) then
+        self:RequestPage(1);
+    end
+end
+
+function _module:Clear()
+    for i = 1, 16 do
+        if (self._records[i] ~= nil) then
+            self._records[i]:SetActive(false);
+        end
+    end
+    self._page = 1;
+    self._totalPage = 0;
+    self:UpdatePageText();
+end
+
+function _module.OnRequestRespone(code, text)
+    local self = _module;
+    self._requesting = false;
+    local ui = CS.NiuMa.LuaUGUI;
+    local t = rapidjson.decode(text);
+    if (code == 200) then
+        self._page = t.pageNum;
+        self._totalPage = math.ceil(t.total / 16);
+        self:UpdatePageText();
+        local nums = 0;
+        if (t.records ~= nil and t.records ~= rapidjson.null) then
+            nums = #(t.records);
+        end
+        for i = 1, nums do
+            local record = t.records[i];
+            if (self._records[i] ~= nil) then
+                self._records[i]:SetActive(true);
+            end
+            if (self._textUserIDs[i] ~= nil) then
+                ui.SetText(self._textUserIDs[i], record.juniorId);
+            end
+            if (self._textRewards[i] ~= nil) then
+                ui.SetText(self._textRewards[i], tostring(record.amount));
+            end
+            if (self._textStates[i] ~= nil) then
+                ui.SetText(self._textStates[i], record.remark);
+            end
+            if (self._textTimes[i] ~= nil) then
+                ui.SetText(self._textTimes[i], record.time);
+            end
+        end
+        for i = nums + 1, 16 do
+            if (self._records[i] ~= nil) then
+                self._records[i]:SetActive(false);
+            end
+        end
+    end
+end
+
+function _module:UpdatePageText()
+    local text = "";
+    if (self._totalPage > 0) then
+        text = tostring(self._page) .. "/" .. tostring(self._totalPage);
+    end
+    if (self._textPage ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textPage, text);
+    end
+end
+
+return _module;

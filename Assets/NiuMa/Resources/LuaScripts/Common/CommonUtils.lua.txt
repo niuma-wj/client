@@ -1,0 +1,28 @@
+-- CommonUtils.lua
+-- 描述：公共实用工具模块
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.20
+
+local rapidjson = require('rapidjson');
+
+local _module = {};
+
+function _module.IsStringEmpty(str)
+	if (str == nil or str == rapidjson.null) then
+		return true;
+	end
+	if (#str == 0) then
+		return true;
+	end
+	return false;
+end
+
+function _module.IsStringNotEmpty(str)
+	if (_module.IsStringEmpty(str)) then
+		return false;
+	end
+	return true;
+end
+
+return _module;

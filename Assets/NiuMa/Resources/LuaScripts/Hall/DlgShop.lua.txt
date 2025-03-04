@@ -1,0 +1,103 @@
+-- 描述：商店界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.10.25
+
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("Frame/Diamonds");
+    local child1 = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+        for i = 1, 6 do
+            child1 = child:Find("Diamond" .. i);
+            if (child1 ~= nil) then
+                child1 = child1:Find("BtnBuy");
+                if (child1 ~= nil) then
+                    ui.AddBtnAction(child1.gameObject, self.OnBuyClick, i);
+                end
+            end
+        end
+    end
+    child = obj.transform:Find("Frame/BtnClose");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnCloseClick);
+	end
+    self._index = nil;
+    self._buying = false;
+end
+
+function _module:SetHall(hall)
+    self._hall = hall;
+end
+
+function _module:Start()
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+	self:Show(false);
+end
+
+function _module.OnBuyClick(idx)
+    if (idx < 1 or idx > 6) then
+        return;
+    end 
+    local self = _module;
+    if (self._buying) then
+        return;
+    end
+    local diamonds = { 20, 50, 100, 200, 300, 500 };
+    local golds = { 100, 240, 460, 880, 1260, 2000 };
+    local text = "确定购买" .. tostring(diamonds[idx]) .. "枚钻石吗？将花费" .. tostring(golds[idx]) .. "金币。";
+    self._index = idx;
+    CS.NiuMa.GameManager.Instance:ShowPromptDialog(text, self.DoBuy);
+    self._buying = true;
+end
+
+function _module.DoBuy()
+    local self = _module;
+    if (self._index == nil) then
+        return;
+    end
+    local path = "/player/capital/diamond/buy/" .. tostring(self._index);
+    CS.NiuMa.GameManager.Instance:AuthGet(path, self.OnBuyResponse);
+end
+
+function _module.OnBuyResponse(code, text)
+    local self = _module;
+    self._buying = false;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code == 200) then
+        gm.Gold = t.gold;
+        gm.Diamond = t.diamond;
+        if (self._hall ~= nil) then
+            self._hall:OnBuyDiamond();
+        end
+        gm:ShowPromptTip("购买钻石成功", 2.0);
+    else
+        local msg = t.msg;
+        if (msg == nil or #msg == 0) then
+            msg = text;
+        end
+        msg = "购买钻石失败：" .. msg;
+        gm:ShowPromptTip(msg, 3.0);
+    end
+end
+
+return _module;

@@ -1,0 +1,254 @@
+local base = require 'BehaviourBase';
+local com_def = require 'Common.Defines';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child = obj.transform:Find("Frame");
+	local child1 = nil;
+	local child2 = nil;
+	local ui = CS.NiuMa.LuaUGUI;
+	if (child ~= nil) then
+		child1 = child:Find("BtnClose");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnCloseClick);
+		end
+		child1 = child:Find("BtnCreateRoom");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnCreateClick);
+		end
+		child1 = child:Find("ModeGroup");
+		if (child1 ~= nil) then
+			child2 = child1:Find("ToggleZuanShi");
+			if (child2 ~= nil) then
+				ui.AddToggleClick(child2.gameObject, self.OnDiamondModeChanged);
+			end
+			child2 = child1:Find("ToggleChouShui");
+			if (child2 ~= nil) then
+				ui.AddToggleClick(child2.gameObject, self.OnGoldModeChanged);
+			end
+			child2 = child1:Find("TextMode1");
+			if (child2 ~= nil) then
+				self._textMode1 = child2.gameObject;
+			end
+			child2 = child1:Find("TextMode2");
+			if (child2 ~= nil) then
+				self._textMode2 = child2.gameObject;
+			end
+		end
+		child1 = child:Find("DiZhuGroup1");
+		if (child1 ~= nil) then
+			self._diZhuGroup1 = child1.gameObject;
+			local funcName = nil;
+			for i = 1, 5 do
+				child2 = child1:Find("Toggle"..i);
+				if (child2 ~= nil) then
+					funcName = "OnDiZhu1"..i.."Changed";
+					ui.AddToggleClick(child2.gameObject, self[funcName]);
+				end
+			end
+		end
+		child1 = child:Find("DiZhuGroup2");
+		if (child1 ~= nil) then
+			self._diZhuGroup2 = child1.gameObject;
+			local funcName = nil;
+			for i = 1, 5 do
+				child2 = child1:Find("Toggle"..i);
+				if (child2 ~= nil) then
+					funcName = "OnDiZhu2"..i.."Changed";
+					ui.AddToggleClick(child2.gameObject, self[funcName]);
+				end
+			end
+		end
+		child1 = child:Find("WanFaGroup");
+		if (child1 ~= nil) then
+			child2 = child1:Find("ToggleChi");
+			if (child2 ~= nil) then
+				ui.AddToggleClick(child2.gameObject, self.OnChiChanged);
+			end
+			child2 = child1:Find("ToggleFangPao");
+			if (child2 ~= nil) then
+				ui.AddToggleClick(child2.gameObject, self.OnFangPaoChanged);
+			end
+		end
+	end
+	self._mode = 0;
+	self._diZhu1 = 0;
+	self._diZhu2 = 0;
+	self._dianPao = true;
+end
+
+function _module:Start()
+	self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetHall(hall)
+	self._hall = hall;
+end
+
+function _module.OnCloseClick()
+	local self = _module;
+	if (self.gameObject ~= nil) then
+		self.gameObject:SetActive(false);
+	end
+end
+
+--点击创建房间按钮
+function _module.OnCreateClick()
+	local self = _module;
+	local msg = {};
+	msg.gameType = com_def.GameType.Mahjong;
+	local t = {};
+	t.mode = self._mode;
+	if (self._mode == 0) then
+		t.diZhu = self._diZhu1;
+	else
+		t.diZhu = self._diZhu2;
+	end
+	local config = 0;
+	local util = CS.NiuMa.Utility;
+	if (self._chi) then
+		config = util.BitwiseOr(config, 1);
+	end
+	if (self._dianPao) then
+		config = util.BitwiseOr(config, 2);
+	end
+	t.rule = config;
+	local text = rapidjson.encode(t);
+	msg.base64 = util.EncodeBase64(text);
+	local body = rapidjson.encode(msg);
+	CS.NiuMa.GameManager.Instance:AuthPost("/player/game/create", body, self._hall.OnCreateResponse);
+    self:Show(false);
+end
+
+function _module.OnDiamondModeChanged(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._mode = 0;
+	self:OnModeChanged();
+end
+
+function _module.OnGoldModeChanged(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._mode = 1;
+	self:OnModeChanged();
+end
+
+function _module:OnModeChanged()
+	local flag = (self._mode == 1);
+	if (self._diZhuGroup1 ~= nil) then
+		self._diZhuGroup1:SetActive(not flag);
+	end
+	if (self._diZhuGroup2 ~= nil) then
+		self._diZhuGroup2:SetActive(flag);
+	end
+	if (self._textMode1 ~= nil) then
+		self._textMode1:SetActive(not flag);
+	end
+	if (self._textMode2 ~= nil) then
+		self._textMode2:SetActive(flag);
+	end
+end
+
+function _module.OnDiZhu11Changed(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._diZhu1 = 0;
+end
+
+function _module.OnDiZhu12Changed(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._diZhu1 = 1;
+end
+
+function _module.OnDiZhu13Changed(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._diZhu1 = 2;
+end
+
+function _module.OnDiZhu14Changed(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._diZhu1 = 3;
+end
+
+function _module.OnDiZhu15Changed(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._diZhu1 = 4;
+end
+
+function _module.OnDiZhu21Changed(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._diZhu2 = 0;
+end
+
+function _module.OnDiZhu22Changed(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._diZhu2 = 1;
+end
+
+function _module.OnDiZhu23Changed(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._diZhu2 = 2;
+end
+
+function _module.OnDiZhu24Changed(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._diZhu2 = 3;
+end
+
+function _module.OnDiZhu25Changed(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._diZhu2 = 4;
+end
+
+function _module.OnChiChanged(val)
+	local self = _module;
+	self._chi = val;
+end
+
+function _module.OnFangPaoChanged(val)
+	local self = _module;
+	self._dianPao = val;
+end
+
+return _module;

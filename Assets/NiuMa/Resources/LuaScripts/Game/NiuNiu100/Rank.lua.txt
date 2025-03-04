@@ -1,0 +1,79 @@
+-- 描述：百人牛牛排行榜界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.19
+
+local base = require 'BehaviourBase';
+local RankPlayer = require 'Game.NiuNiu100.RankPlayer';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Frame/BtnClose");
+    if (child ~= nil) then
+        CS.NiuMa.LuaUGUI.AddBtnClick(child.gameObject, self.OnCloseClick);
+    end
+    self._playerParent = obj.transform:Find("Frame/PlayerList/Viewport/Content");
+end
+
+function _module:Start()
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+   self:Show(false);
+end
+
+function _module:ClearPlayers()
+    if (self._players == nil) then
+        return;
+    end
+    local GameObject = CS.UnityEngine.GameObject;
+    local nums = #(self._players);
+    for i = 1, nums do
+        GameObject.Destroy(self._players[i]);
+    end
+    self._players = {};
+end
+
+function _module:CreateRankPlayer(rank, player)
+    if (self._playerPrefab == nil or self._playerParent == nil) then
+        return ;
+    end
+    local obj = CS.UnityEngine.GameObject.Instantiate(self._playerPrefab, self._playerParent);
+    if (obj ~= nil) then
+        table.insert(self._players, obj);
+        local rp = RankPlayer.NewInstance();
+        rp.gameObject = obj;
+        rp:Awake();
+        rp:SetPlayer(rank, player);
+    end
+end
+
+function _module:OnRankList(msg)
+    self:ClearPlayers();
+    if (self._players == nil) then
+        self._players = {};
+    end
+    if (self._playerPrefab == nil) then
+        local prefabName = "Prefabs/Game/NiuNiu100/RankPlayer";
+        self._playerPrefab = CS.NiuMa.ResourceManager.Instance:LoadResource(prefabName, "prefabs/niuniu100.ab", "Assets/NiuMa/Resources/", ".prefab");
+    end
+    if (self._playerPrefab == nil) then
+        return ;
+    end
+    local nums = #(msg.items);
+    for i = 1, nums do
+        local playerId = msg.items[i].playerId;
+        if (playerId ~= nil and #playerId > 0) then
+            self:CreateRankPlayer(i, msg.items[i]);
+        end
+    end
+end
+
+return _module;

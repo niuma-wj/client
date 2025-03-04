@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<BuildMap>
+  <AssetBundle Name="LuaScripts.ab" Relative="NiuMa/Resources/LuaScripts">NiuMa/Resources/LuaScripts</AssetBundle>
+</BuildMap>

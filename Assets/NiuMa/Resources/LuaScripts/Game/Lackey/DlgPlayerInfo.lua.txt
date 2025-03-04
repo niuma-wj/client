@@ -1,0 +1,176 @@
+-- 描述：逮狗腿玩家信息对话框脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.19
+
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Frame");
+    local child1 = nil;
+    if (child ~= nil) then
+        self._frame = child;
+    end
+    child1 = child:Find("TextName");
+    if (child1 ~= nil) then
+        self._textName = child1.gameObject;
+    end
+    child1 = child:Find("Male");
+    if (child1 ~= nil) then
+        self._male = child1.gameObject;
+    end
+    child1 = child:Find("Female");
+    if (child1 ~= nil) then
+        self._female = child1.gameObject;
+    end
+    child1 = child:Find("TextIP");
+    if (child1 ~= nil) then
+        self._textIP = child1.gameObject;
+    end
+    child1 = child:Find("TextAddress");
+    if (child1 ~= nil) then
+        self._textAddress = child1.gameObject;
+    end
+    child1 = child:Find("TextRate");
+    if (child1 ~= nil) then
+        self._textRate = child1.gameObject;
+    end
+    child1 = child:Find("TextWin");
+    if (child1 ~= nil) then
+        self._textWin = child1.gameObject;
+    end
+    child1 = child:Find("TextLose");
+    if (child1 ~= nil) then
+        self._textLose = child1.gameObject;
+    end
+    child1 = child:Find("TextDraw");
+    if (child1 ~= nil) then
+        self._textDraw = child1.gameObject;
+    end
+    child1 = child:Find("TextDraw");
+    if (child1 ~= nil) then
+        self._textDraw = child1.gameObject;
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    child1 = child:Find("BtnFlower");
+    if (child1 ~= nil) then
+        ui.AddBtnAction(child1.gameObject, self.OnEffectClick, 1);
+    end
+    child1 = child:Find("BtnBomb");
+    if (child1 ~= nil) then
+        ui.AddBtnAction(child1.gameObject, self.OnEffectClick, 2);
+    end
+    child1 = child:Find("BtnTuoXie");
+    if (child1 ~= nil) then
+        ui.AddBtnAction(child1.gameObject, self.OnEffectClick, 3);
+    end
+    child1 = child:Find("BtnChicken");
+    if (child1 ~= nil) then
+        ui.AddBtnAction(child1.gameObject, self.OnEffectClick, 4);
+    end
+    child1 = child:Find("BtnDog");
+    if (child1 ~= nil) then
+        ui.AddBtnAction(child1.gameObject, self.OnEffectClick, 5);
+    end
+end
+
+function _module:Start()
+	self.gameObject:SetActive(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetPosition(idx)
+    if (self._frame == nil) then
+        return;
+    end
+    local Vector2 = CS.UnityEngine.Vector2;
+    if (idx == 2) then
+        self._frame.anchoredPosition = Vector2(340.0, -60.0);
+    elseif (idx == 3) then
+        self._frame.anchoredPosition = Vector2(340.0, 200.0);
+    elseif (idx == 4) then
+        self._frame.anchoredPosition = Vector2(-340.0, 200.0);
+    elseif (idx == 5) then
+        self._frame.anchoredPosition = Vector2(-340.0, -60.0);
+    end
+end
+
+function _module:SetPlayerId(playerId)
+	self._playerId = playerId;
+end
+
+function _module:SetSex(sex)
+	if (self._male ~= nil) then
+		self._male:SetActive(sex == 2);
+	end
+	if (self._female ~= nil) then
+		self._female:SetActive(sex == 1);
+	end
+end
+
+function _module:SetName(name)
+	if (self._textName ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textName, name);
+	end
+end
+
+function _module:SetIP(ip)
+	if (self._textIP ~= nil) then
+		CS.NiuMa.LuaUGUI.SetText(self._textIP, ip);
+	end
+end
+
+function _module:SetAddress(addr)
+	if (self._textAddress ~= nil) then
+        local ui = CS.NiuMa.LuaUGUI;
+        if (addr == nil or #addr == 0) then
+            ui.SetText(self._textAddress, "未知");
+        else
+		    ui.SetText(self._textAddress, addr);
+        end
+	end
+end
+
+function _module:SetWinLose(win, lose, draw)
+    local ui = CS.NiuMa.LuaUGUI;
+    if (self._textWin ~= nil) then
+		ui.SetText(self._textWin, tostring(win));
+	end
+    if (self._textLose ~= nil) then
+		ui.SetText(self._textLose, tostring(lose));
+	end
+    if (self._textDraw ~= nil) then
+		ui.SetText(self._textDraw, tostring(draw));
+	end
+    local total = win + lose + draw;
+    local rate = 0;
+    if (total > 0) then
+        rate = win / total;
+    end
+    rate = rate * 100.0;
+    if (self._textRate ~= nil) then
+		ui.SetText(self._textRate, string.format("%0.1f%%", rate));
+	end
+end
+
+function _module.OnEffectClick(idx)
+    local self = _module;
+	local gm = CS.NiuMa.GameManager.Instance;
+    local nm = CS.NiuMa.NetworkManager.Instance;
+	local msg = {};
+	msg.venueId = gm.VenueId;
+	msg.index = idx;
+	msg.targetId = self._playerId;
+	local json = rapidjson.encode(msg);
+    nm:SendMessage("MsgEffectClient", json, true);
+	self.gameObject:SetActive(false);
+end
+
+return _module;

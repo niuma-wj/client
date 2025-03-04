@@ -1,0 +1,63 @@
+-- 描述：麻将聊天文本模块
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.10
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Text");
+    if (child ~= nil) then
+        self._text = child.gameObject;
+    end
+    self._length = false;
+end
+
+function _module:Start()
+end
+
+function _module:Update()
+    if ((self._text == nil) or self._length) then
+        return;
+    end
+    --这里调用GetTextPreferredSize传递的0是没有意义的，但如果不传递C#会提示参数不为3个的错误
+    local width, height = CS.NiuMa.LuaUGUI.GetTextPreferredSize(self._text, 0, 0);
+    if (width < 32.0) then
+        width = 32.0;
+    elseif (width > 312.0) then
+        width = 312.0;
+    end
+    if (height < 26.0) then
+        height = 26.0;
+    end
+    width = width + 20.0;
+    height = height + 20.0;
+    local rcTrans = self.gameObject.transform;
+    if (rcTrans ~= null) then
+        rcTrans.sizeDelta = CS.UnityEngine.Vector2(width, height);
+    end
+    self._length = true;
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetChatText(text)
+    if (self._text ~= nil) then
+        self._length = false;
+        CS.NiuMa.LuaUGUI.SetText(self._text, text);
+    end
+end
+
+--因为ChatText被多个地方引用到，而每个引用的地方必须有独立的ChatText实例，因此外部不能直接引用_module，
+--而是调用NewInstance函数创建实例
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

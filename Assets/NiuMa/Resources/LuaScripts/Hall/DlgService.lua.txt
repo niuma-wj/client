@@ -1,0 +1,37 @@
+--local GameManager = Bird.GameManager;
+--local LuaGameUtilities = Bird.LuaGameUtilities;
+--local LuaUGUI = Bird.LuaUGUI;
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("Frame/Back");
+    local child1 = nil;
+    if (child ~= nil) then
+        child1 = child:Find("TextWechat");
+        if (child1 ~= nil) then
+            self._textWechat = child1.gameObject;
+        end
+        child1 = child1:Find("BtnCopy");
+        if (child1 ~= nil) then
+            CS.NiuMa.LuaUGUI.AddBtnClick(child1.gameObject, self.OnCopyClick);
+        end
+    end
+end
+
+function _module:Start()
+end
+
+function _module:OnCopyClick()
+    if (self._textWechat == nil) then
+        return;
+    end
+    local text = LuaUGUI.GetText(self._textWechat);
+    if (text ~= nil and #text > 0) then
+        LuaGameUtilities.CopyToClipboard(text);
+        GameManager.Instance:ShowPromptTip("复制微信号到剪切板成功", 2.0);
+    end
+end
+
+return _module;

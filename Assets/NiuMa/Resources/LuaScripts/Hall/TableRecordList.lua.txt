@@ -1,0 +1,54 @@
+--local ResourceManager = Bird.ResourceManager;
+--local GameManager = Bird.GameManager;
+--local GameObject = UnityEngine.GameObject;
+local base = require 'BehaviourBase';
+local TableRecord = require "Hall.TableRecord";
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    self._tableRecords = {};
+    local obj = self.gameObject;
+    local child = obj.transform:Find("Viewport/Content");
+    if (child ~= nil) then
+        self._recordParent = child;
+    end
+end
+
+function _module:Start()
+end
+
+function _module:SetTableType(tableType)
+    self._tableType = tableType;
+end
+
+function _module:OnTableReords(msg)
+    if (msg == nil) then
+		return;
+	end
+    if (msg.TableType ~= self._tableType) then
+        return;
+    end
+    local nums = #self._tableRecords;
+    for i = 1, nums do
+        GameObject.Destroy(self._tableRecords[i]);
+    end
+    self._tableRecords = {};
+    local prefab = ResourceManager.Instance:LoadResource("Prefabs/TableRecord", "prefabs/hall.ab", "Assets/NiuMa/Resources/", ".prefab");
+    if (prefab == nil) then
+        return;
+    end
+    nums = #(msg.Records);
+    for i = 1, nums do
+        local rec = msg.Records[i];
+		--print("record:" .. tostring(rec));
+        local obj = GameObject.Instantiate(prefab, self._recordParent);
+        if (obj ~= nil) then
+            table.insert(self._tableRecords, obj);
+            local tr = TableRecord.Awake(obj);
+            tr:SetTableRecord(rec);
+        end
+    end
+end
+
+return _module;

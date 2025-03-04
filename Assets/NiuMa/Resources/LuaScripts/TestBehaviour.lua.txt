@@ -1,0 +1,26 @@
+-- 描述：LuaBehaviour测试脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.10.25
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+_module.field1 = "test1111";
+
+function _module:func1()
+	print("Hello wolrd!");
+	print(self.field1);
+end
+
+function _module:Start()
+	self:func1();
+end
+
+Module = {
+	Getter = function()
+		return _module;
+	end
+}
+
+return _module;

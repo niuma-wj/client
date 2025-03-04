@@ -1,0 +1,186 @@
+local mah_def = require 'Game.Mahjong.MahjongDefines';
+local mah_gen = require 'Game.Mahjong.MahjongGenerator';
+
+local _module = {};
+
+function _module:Initialize()
+    local bgMusic = CS.NiuMa.AudioManager.Instance.BackgroundMusic;
+    if (bgMusic == nil) then
+        return ;
+    end
+    local resName = "Sounds/Game/Mahjong/game_back";
+    local audioClip = CS.NiuMa.ResourceManager.Instance:LoadResource(resName, "sounds/mahjong.ab", "Assets/NiuMa/Resources/", ".mp3");
+    if (audioClip ~= nil) then
+        bgMusic.clip = audioClip;
+        bgMusic:Play();
+    end
+end
+
+function _module:SetAudioSources(soundGames, soundPhrases, soundAlert)
+    self._soundGames = soundGames;
+    self._soundPhrases = soundPhrases;
+	self._soundAlert = soundAlert;
+end
+
+function _module:GetAudioClip(clipName)
+    if (self._audioClips == nil) then
+        self._audioClips = {};
+    end
+    local clip = self._audioClips[clipName];
+    if (clip ~= nil) then
+        return clip;
+    end
+    clip = CS.NiuMa.ResourceManager.Instance:LoadResource(clipName, "sounds/mahjong.ab", "Assets/NiuMa/Resources/", ".mp3");
+    if (clip ~= nil) then
+        self._audioClips[clipName] = clip;
+    end
+    return clip;
+end
+
+--播放麻将出牌声音
+function _module:PlayTile(clientSeat, pat, num, male)
+    if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+    if (self._soundGames == nil or self._soundGames[clientSeat] == nil) then
+        return;
+    end
+    local isNum = false;
+    local clipName = "";
+    if (pat == mah_def.MahjongPattern.Wan) then
+        isNum = true;
+        clipName = "wan";
+    elseif (pat == mah_def.MahjongPattern.Tong) then
+        isNum = true;
+        clipName = "tong";
+    elseif (pat == mah_def.MahjongPattern.Tiao) then
+        isNum = true;
+        clipName = "tiao";
+    elseif (pat == mah_def.MahjongPattern.Dong) then
+        clipName = "zi1";
+    elseif (pat == mah_def.MahjongPattern.Nan) then
+        clipName = "zi2";
+    elseif (pat == mah_def.MahjongPattern.Xi) then
+        clipName = "zi3";
+    elseif (pat == mah_def.MahjongPattern.Bei) then
+        clipName = "zi4";
+    elseif (pat == mah_def.MahjongPattern.Zhong) then
+        clipName = "zi5";
+    elseif (pat == mah_def.MahjongPattern.Fa) then
+        clipName = "zi6";
+    elseif (pat == mah_def.MahjongPattern.Bai) then
+        clipName = "zi7";
+    elseif (pat <= mah_def.MahjongPattern.Zhu and pat > mah_def.MahjongPattern.Bai) then
+        clipName = "hua";
+    end
+    if (isNum) then
+        clipName = clipName..tostring(num);
+    end
+    if (male) then
+        clipName = "Sounds/Game/Mahjong/Mahjong/Male/Tile/"..clipName;
+    else
+        clipName = "Sounds/Game/Mahjong/Mahjong/Female/Tile/"..clipName;
+    end
+    local clip = self:GetAudioClip(clipName);
+    if (clip ~= nil) then
+        self._soundGames[clientSeat].clip = clip;
+        self._soundGames[clientSeat]:Play();
+    end
+end
+
+--播放麻将碰、杠、吃、胡、自摸声音
+function _module:PlayAction(clientSeat, action, male)
+    if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+    if (self._soundGames == nil or self._soundGames[clientSeat] == nil) then
+        return;
+    end
+    local clipName = "";
+    if (action == mah_def.MahjongAction.Chi) then
+        clipName = "chi";
+    elseif (action == mah_def.MahjongAction.Peng) then
+        clipName = "peng";
+    elseif (action == mah_def.MahjongAction.ZhiGang or
+            action == mah_def.MahjongAction.JiaGang or
+            action == mah_def.MahjongAction.AnGang) then
+        clipName = "gang";
+    elseif (action == mah_def.MahjongAction.DianPao) then
+        clipName = "hu";
+    elseif (action == mah_def.MahjongAction.ZiMo) then
+        clipName = "zimo";
+    end
+    if (male) then
+        clipName = "Sounds/Game/Mahjong/Mahjong/Male/Action/"..clipName;
+    else
+        clipName = "Sounds/Game/Mahjong/Mahjong/Female/Action/"..clipName;
+    end
+    local clip = self:GetAudioClip(clipName);
+    if (clip ~= nil) then
+        self._soundGames[clientSeat].clip = clip;
+        self._soundGames[clientSeat]:Play();
+    end
+end
+
+function _module:PlayPhrase(clientSeat, phrase, male)
+    if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+    if (self._soundPhrases == nil or self._soundPhrases[clientSeat] == nil) then
+        return;
+    end
+    local clipName = "";
+    if (male) then
+        clipName = "Sounds/Game/Mahjong/Phrase/Male/chat_"..phrase;
+    else
+        clipName = "Sounds/Game/Mahjong/Phrase/Female/chat_"..phrase;
+    end
+    local clip = self:GetAudioClip(clipName);
+    if (clip ~= nil) then
+        self._soundPhrases[clientSeat].clip = clip;
+        self._soundPhrases[clientSeat]:Play();
+    end
+end
+
+function _module:PlayEffect(clientSeat, effect)
+    if (CS.NiuMa.AudioManager.Instance.MuteSound) then
+        return;
+    end
+    if (self._soundGames == nil or self._soundGames[clientSeat] == nil) then
+        return;
+    end
+    local clipName = "";
+    if (effect == 1) then
+        clipName = "Sounds/Game/Mahjong/EffectFlower";
+    elseif (effect == 2) then
+        clipName = "Sounds/Game/Mahjong/EffectBeer";
+    elseif (effect == 3) then
+        clipName = "Sounds/Game/Mahjong/EffectEgg";
+    elseif (effect == 4) then
+        clipName = "Sounds/Game/Mahjong/EffectZan";
+    else
+        return;
+    end
+    local clip = self:GetAudioClip(clipName);
+    if (clip ~= nil) then
+        self._soundGames[clientSeat].clip = clip;
+        self._soundGames[clientSeat]:Play();
+    end
+end
+
+function _module:PlayAlert(playOrStop)
+	if (self._soundAlert ~= nil) then
+		if (playOrStop) then
+			self._soundAlert:Play();
+		else
+			self._soundAlert:Stop();
+		end
+	end
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

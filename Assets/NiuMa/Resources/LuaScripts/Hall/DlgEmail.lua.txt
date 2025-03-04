@@ -1,0 +1,30 @@
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+	local child = obj.transform:Find("Frame/BtnClose");
+	if (child ~= nil) then
+		CS.NiuMa.LuaUGUI.AddBtnClick(child.gameObject, self.OnCloseClick);
+	end
+end
+
+function _module:Start()
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+function _module.OnCloseClick()
+	local self = _module;
+	self:Show(false);
+end
+
+return _module;

@@ -1,0 +1,406 @@
+-- 描述：代理界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.10.25
+local base = require 'BehaviourBase';
+local Transfer = require 'Hall.AgencyTransfer';
+local XiaXian = require 'Hall.AgencyXiaXian';
+local Details = require 'Hall.AgencyDetails';
+local Accept = require 'Hall.AgencyAccept';
+local XiaJi = require 'Hall.AgencyXiaJi';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("Frame/Left");
+    local child1 = nil;
+    local child2 = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+        child1 = child:Find("ToggleGroup");
+        if (child1 ~= nil) then
+            child2 = child1:Find("ToggleTransfer");
+            if (child2 ~= nil) then
+                ui.AddToggleClick(child2.gameObject, self.OnTransferCheck);
+            end
+            child2 = child1:Find("ToggleXiaXian");
+            if (child2 ~= nil) then
+                ui.AddToggleClick(child2.gameObject, self.OnXiaXianCheck);
+            end
+            child2 = child1:Find("ToggleDetail");
+            if (child2 ~= nil) then
+                ui.AddToggleClick(child2.gameObject, self.OnDetailCheck);
+            end
+            child2 = child1:Find("ToggleRecord");
+            if (child2 ~= nil) then
+                ui.AddToggleClick(child2.gameObject, self.OnRecordCheck);
+            end
+			child2 = child1:Find("ToggleXiaJi");
+            if (child2 ~= nil) then
+                ui.AddToggleClick(child2.gameObject, self.OnXiaJiCheck);
+            end
+        end
+    end
+    child = obj.transform:Find("Frame/Middle");
+    if (child ~= nil) then
+        child1 = child:Find("Transfer");
+        if (child1 ~= nil) then
+            Transfer.gameObject = child1.gameObject;
+            Transfer:Awake();
+            self._transfer = Transfer;
+        end
+        child1 = child:Find("XiaXian");
+        if (child1 ~= nil) then
+            XiaXian.gameObject = child1.gameObject;
+            XiaXian:Awake();
+            self._xiaXian = XiaXian;
+        end
+        child1 = child:Find("Details");
+        if (child1 ~= nil) then
+            Details.gameObject = child1.gameObject;
+            Details:Awake();
+            self._details = Details;
+        end
+        child1 = child:Find("Accept");
+        if (child1 ~= nil) then
+            Accept.gameObject = child1.gameObject;
+            Accept:Awake();
+            self._accept = Accept;
+        end
+		child1 = child:Find("XiaJi");
+        if (child1 ~= nil) then
+            XiaJi.gameObject = child1.gameObject
+            XiaJi:Awake();
+            self._xiaJi = XiaJi;
+        end
+    end
+	child = obj.transform:Find("Frame/Right");
+    if (child ~= nil) then
+		child1 = child:Find("TextLevel/Text");
+        if (child1 ~= nil) then
+            self._textLevel = child1.gameObject;
+        end
+		child1 = child:Find("TextXiaXian/Text");
+        if (child1 ~= nil) then
+            self._totalXiaXian = child1.gameObject;
+        end
+		child1 = child:Find("TextSuper/Text");
+        if (child1 ~= nil) then
+            self._superIncome = child1.gameObject;
+        end
+		child1 = child:Find("TextTotal/Text");
+        if (child1 ~= nil) then
+            self._totalAccept = child1.gameObject;
+        end
+        child1 = child:Find("TextReward/Text");
+        if (child1 ~= nil) then
+            self._textReward = child1.gameObject;
+        end
+        child1 = child:Find("BtnAccept");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnAcceptClick);
+        end
+	end
+    child = obj.transform:Find("Frame/BtnClose");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnCloseClick);
+	end
+    self._page = 1;
+    self._pageFlags = { false, false, false, false };
+    self._reward = 0;
+    self._collecting = false;
+end
+
+function _module:Start()
+    self:Show(false);
+end
+
+function _module:Update()
+    if (self._transfer ~= nil and self._transfer:IsVisible()) then
+        self._transfer:Update();
+    end
+    if (self._xiaXian ~= nil and self._xiaXian:IsVisible()) then
+        self._xiaXian:Update();
+    end
+    if (self._details ~= nil and self._details:IsVisible()) then
+        self._details:Update();
+    end
+    if (self._accept ~= nil and self._accept:IsVisible()) then
+        self._accept:Update();
+    end
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+	self:Show(false);
+end
+
+function _module:OnShowDialog()
+    -- 显示窗口后获取代理数据，并清空相关表格
+	local gm = CS.NiuMa.GameManager.Instance;
+    gm:AuthGet("/player/agency/get", self.OnResponseAgency);
+
+    for i = 1, 4 do
+        self._pageFlags[i] = (self._page == i);
+    end
+    if (self._transfer ~= nil) then
+        self._transfer:Clear();
+        if (self._page == 1) then
+            self._transfer:UpdateFirstPage();
+        end
+    end
+    if (self._xiaXian ~= nil) then
+        self._xiaXian:Clear();
+        if (self._page == 2) then
+            self._xiaXian:UpdateFirstPage();
+        end
+    end
+    if (self._details ~= nil) then
+        self._details:Clear();
+        if (self._page == 3) then
+            self._details:UpdateFirstPage();
+        end
+    end
+    if (self._accept ~= nil) then
+        self._accept:Clear();
+        if (self._page == 4) then
+            self._accept:UpdateFirstPage();
+        end
+    end
+end
+
+function _module:OnMessage(msgName, buf)
+    --print("Process message:"..msgName);
+    local ret = true;
+    if (msgName == "HP_GET_AGENCY_DATA") then
+        self:OnGetAgencyData(buf);
+    elseif (msgName == "HP_ACCEPT_REWARD") then
+        self:OnAcceptReward(buf);
+    elseif (msgName == "HP_AGENCY_TRANSFER") then
+        self:OnAgencyTransfer(buf);
+    elseif (msgName == "HP_TRANSFER_RECORD") then
+        self:OnTransferRecord(buf);
+    elseif (msgName == "HP_UNDER_PLAYERS") then
+        self:OnUnderPlayers(buf);
+	elseif (msgName == "HP_UNDER_AGENCY") then
+		self:OnUnderAgency(buf);
+    elseif (msgName == "HP_REWARD_DETAILS") then
+        self:OnRewardDetails(buf);
+    elseif (msgName == "HP_ACCEPT_RECORD") then
+        self:OnAcceptRecord(buf);
+    else
+        ret = false;
+    end
+    return ret;
+end
+
+function _module.OnResponseAgency(code, text)
+    if (code == 200) then
+        local self = _module;
+        local t = rapidjson.decode(text);
+        local ui = CS.NiuMa.LuaUGUI;
+	    if (self._textLevel ~= nil) then
+		    ui.SetText(self._textLevel, tostring(t.level));
+	    end
+	    if (self._totalXiaXian ~= nil) then
+		    ui.SetText(self._totalXiaXian, tostring(t.juniorCount) .. "人");
+	    end
+        if (self._textReward ~= nil) then
+            ui.SetText(self._textReward, tostring(t.currentReward));
+        end
+        if (self._totalAccept ~= nil) then
+            ui.SetText(self._totalAccept, tostring(t.totalReward));
+        end
+	    if (self._superIncome ~= nil) then
+            ui.SetText(self._superIncome, tostring(t.indirectReward));
+        end
+	    if (self._xiaJi ~= nil) then
+            self._xiaJi:SetLevel(t.level);
+	    end
+        self._reward = t.currentReward;
+    end
+end
+
+function _module.OnTransferCheck(val)
+	if (not val) then
+		return;
+	end
+    local self = _module;
+    self._page = 1;
+    self:OnPageSelected();
+end
+
+function _module.OnXiaXianCheck(val)
+	if (not val) then
+		return;
+	end
+    local self = _module;
+    self._page = 2;
+    self:OnPageSelected();
+end
+
+function _module.OnDetailCheck(val)
+	if (not val) then
+		return;
+	end
+    local self = _module;
+    self._page = 3;
+    self:OnPageSelected();
+end
+
+function _module.OnRecordCheck(val)
+	if (not val) then
+		return;
+	end
+    local self = _module;
+    self._page = 4;
+    self:OnPageSelected();
+end
+
+function _module.OnXiaJiCheck(val)
+	if (not val) then
+		return;
+	end
+    local self = _module;
+    self._page = 5;
+    self:OnPageSelected();
+end
+
+function _module:OnPageSelected()
+    if (self._transfer ~= nil) then
+        self._transfer:Show(self._page == 1);
+        if (self._page == 1 and not self._pageFlags[1]) then
+            self._pageFlags[1] = true;
+            self._transfer:UpdateFirstPage();
+        end
+    end
+    if (self._xiaXian ~= nil) then
+        self._xiaXian:Show(self._page == 2);
+        if (self._page == 2 and not self._pageFlags[2]) then
+            self._pageFlags[2] = true;
+            self._xiaXian:UpdateFirstPage();
+        end
+    end
+    if (self._details ~= nil) then
+        self._details:Show(self._page == 3);
+        if (self._page == 3 and not self._pageFlags[3]) then
+            self._pageFlags[3] = true;
+            self._details:UpdateFirstPage();
+        end
+    end
+    if (self._accept ~= nil) then
+        self._accept:Show(self._page == 4);
+        if (self._page == 4 and not self._pageFlags[4]) then
+            self._pageFlags[4] = true;
+            self._accept:UpdateFirstPage();
+        end
+    end
+	if (self._xiaJi ~= nil) then
+        self._xiaJi:Show(self._page == 5);
+	end
+end
+
+function _module.OnAcceptClick()
+    local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    if (self._reward > 0) then
+        if (self._collecting) then
+            return;
+        end
+        gm:AuthGet("/player/agency/collect", self.OnCollectResponse);
+        self._collecting = true;
+    else
+        gm:ShowPromptTip("当前无奖励可领取", 2.0);
+    end
+end
+
+function _module.OnCollectResponse(code, text)
+    local self = _module;
+    self._collecting = false;
+    local ui = CS.NiuMa.LuaUGUI;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code == 200) then
+        local tip = "成功领取奖励" .. tostring(t.amount) .. "金币";
+        gm.Deposit = t.deposit;
+        gm:ShowPromptTip(tip, 2.0);
+        if (self._transfer ~= nil) then
+            self._transfer:AfterCollect();
+        end
+        if (self._textReward ~= nil) then
+            ui.SetText(self._textReward, "0");
+        end
+        if (self._totalAccept ~= nil) then
+            ui.SetText(self._totalAccept, tostring(t.totalReward));
+        end
+        if (self._page == 4 and self._accept ~= nil) then
+            self._accept:UpdateFirstPage();
+        end
+        self._reward = 0;
+    else
+        local msg = t.msg;
+        if (msg == nil or #msg == 0) then
+            msg = text;
+        end
+        msg = "领取失败：" .. msg;
+        gm:ShowPromptTip(msg, 3.0);
+    end
+end
+
+function _module:OnUnderAgency
+(buf)
+    if (buf == nil) then
+		return;
+	end
+    local msg = bd_pb.NetMsgInt();
+	msg:ParseFromString(buf);
+	local text = "";
+    if (msg.Val == 1) then
+        text = "设置下级代理成功，该玩家在重新登录后可打开代理界面";
+    elseif (msg.Val == 2) then
+        text = "设置下级代理失败，您不是代理";
+    elseif (msg.Val == 3) then
+        text = "设置下级代理失败，指定的玩家不是您的直接下线";
+    elseif (msg.Val == 4) then
+        text = "设置下级代理失败，指定的玩家已经是代理";
+	elseif (msg.Val == 5) then
+        text = "设置下级代理失败，3级代理不能再设置下级代理";
+	else
+		text = "设置下级代理失败，未知错误";
+    end
+	GameManager.Instance:ShowPromptTip(text, 2.0);
+end
+
+function _module:OnRewardDetails(buf)
+    if (buf == nil) then
+		return;
+	end
+    local msg = hall_pb.NetMsgRewardDetails();
+	msg:ParseFromString(buf);
+    if (self._details ~= nil) then
+        self._details:OnRewardDetails(msg);
+    end
+end
+
+function _module:OnAcceptRecord(buf)
+    if (buf == nil) then
+		return;
+	end
+    local msg = hall_pb.NetMsgAcceptRecord();
+	msg:ParseFromString(buf);
+    if (self._accept ~= nil) then
+        self._accept:OnAcceptRecord(msg);
+    end
+end
+
+return _module;

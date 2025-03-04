@@ -1,0 +1,194 @@
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    self._records = {};
+    self._textIDs = {};
+    self._textAmounts = {};
+    self._textAccounts = {};
+    self._textStatus = {};
+    self._textOrderIDs = {};
+    self._textTimes = {};
+    local obj = self.gameObject;
+    local child = obj.transform:Find("ScrollView/Viewport/Content/List");
+    local child1 = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+        for i = 1, 14 do
+            child1 = child:Find(string.format("Record%02d", i));
+            if (child1 ~= nil) then
+                self._records[i] = child1.gameObject;
+                child2 = child1:Find("TextID");
+                if (child2 ~= nil) then
+                    self._textIDs[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextAmount");
+                if (child2 ~= nil) then
+                    self._textAmounts[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextAccount");
+                if (child2 ~= nil) then
+                    self._textAccounts[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextStatus");
+                if (child2 ~= nil) then
+                    self._textStatus[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextOrderID");
+                if (child2 ~= nil) then
+                    self._textOrderIDs[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextTime");
+                if (child2 ~= nil) then
+                    self._textTimes[i] = child2.gameObject;
+                end
+            end
+        end
+    end
+    child = obj.transform:Find("Page");
+    if (child ~= nil) then
+        child1 = child:Find("BtnFront");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnFrontClick);
+        end
+        child1 = child:Find("BtnNext");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnNextClick);
+        end
+        child1 = child:Find("TextPage");
+        if (child1 ~= nil) then
+            self._textPage = child1.gameObject;
+        end
+    end
+    -- 当前页
+    self._page = 1;
+    -- 总页数
+    self._totalPage = 0;
+    -- 是否正在请求兑换记录数据
+    self._requesting = false;
+end
+
+function _module:Update()
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+function _module:OnShowDialog()
+    --在显示兑换界面时，请求当前页，以刷新数据
+    self:RequestPage(self._page);
+end
+
+function _module.OnFrontClick()
+    local self = _module;
+    if (self._page == 1) then
+        --当前已经是第一页，不能再请求上一页
+        return;
+    end
+    self:RequestPage(self._page - 1);
+end
+
+function _module.OnNextClick()
+    local self = _module;
+    if (self._page >= self._totalPage) then
+        -- 当前已是最后一页不能再请求下一页
+        return;
+    end
+    self:RequestPage(self._page + 1);
+end
+
+-- 请求页面
+function _module:RequestPage(page)
+    if (self._requesting) then
+        -- 当前正在请求数据，但是数据还没有返回，直接退出
+        return;
+    end
+    local t = {};
+    t.pageNum = page;
+    --固定每页14条数据
+    t.pageSize = 14;
+    local body = rapidjson.encode(t);
+    CS.NiuMa.GameManager.Instance:AuthPost("/player/capital/exchange/record", body, self.OnRequestRespone);
+    self._requesting = true;
+end
+
+function _module.OnRequestRespone(code, text)
+    local self = _module;
+    self._requesting = false;
+    local ui = CS.NiuMa.LuaUGUI;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code == 200) then
+        self._page = t.pageNum;
+        self._totalPage = math.ceil(t.total / 14);
+        self:UpdatePageText();
+        local seqNum = (t.pageNum - 1) * 14 + 1;
+        local nums = 0;
+        if (t.records ~= nil and t.records ~= rapidjson.null) then
+            nums = #(t.records);
+        end
+        for i = 1, nums do
+            local record = t.records[i];
+            if (self._records[i] ~= nil) then
+                self._records[i]:SetActive(true);
+            end
+            if (self._textIDs[i] ~= nil) then
+                ui.SetText(self._textIDs[i], tostring(seqNum));
+                seqNum = seqNum + 1;
+            end
+            if (self._textAmounts[i] ~= nil) then
+                ui.SetText(self._textAmounts[i], tostring(record.amount));
+            end
+            if (self._textAccounts[i] ~= nil) then
+                ui.SetText(self._textAccounts[i], tostring(record.account));
+            end
+            if (self._textStatus[i] ~= nil) then
+                --print("status: " .. tostring(record.status));
+                if (record.status == 0) then
+                    ui.SetText(self._textStatus[i], "审核中");
+                elseif (record.status == 1) then
+                    ui.SetText(self._textStatus[i], "兑换成功");
+                else
+                    ui.SetText(self._textStatus[i], "兑换失败");
+                end
+            end
+            if (self._textOrderIDs[i] ~= nil) then
+                ui.SetText(self._textOrderIDs[i], record.orderNumber);
+            end
+            if (self._textTimes[i] ~= nil) then
+                ui.SetText(self._textTimes[i], record.applyTime);
+            end
+        end
+        for i = nums + 1, 14 do
+            if (self._records[i] ~= nil) then
+                self._records[i]:SetActive(false);
+            end
+        end
+    else
+        local msg = t.msg;
+        if (msg == nil or #msg == 0) then
+            msg = text;
+        end
+        msg = "请求兑换记录失败：" .. msg;
+        gm:ShowPromptTip(msg, 2.0);
+    end
+end
+
+function _module:UpdatePageText()
+    local text = "";
+    if (self._totalPage > 0) then
+        text = tostring(self._page) .. "/" .. tostring(self._totalPage);
+    end
+    if (self._textPage ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textPage, text);
+    end
+end
+
+return _module;

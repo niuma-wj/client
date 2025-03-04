@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<GameManifest>
+  <Game Name="Mahjong">
+    <AssetBundle>mahjong/hall.ab</AssetBundle>
+    <AssetBundle>mahjong/room.ab</AssetBundle>
+    <AssetBundle>mahjong/room_ani.ab</AssetBundle>
+    <AssetBundle>mahjong/room_chat.ab</AssetBundle>
+    <AssetBundle>mahjong/room_disband.ab</AssetBundle>
+    <AssetBundle>mahjong/room_jiesuan.ab</AssetBundle>
+    <AssetBundle>mahjong/room_location.ab</AssetBundle>
+    <AssetBundle>mahjong/room_setting.ab</AssetBundle>
+    <AssetBundle>mahjong/tiles.ab</AssetBundle>
+    <AssetBundle>images/chat.ab</AssetBundle>
+    <AssetBundle>images/emojis.ab</AssetBundle>
+    <AssetBundle>sounds/mahjong.ab</AssetBundle>
+    <AssetBundle>prefabs/mahjong_main.ab</AssetBundle>
+    <AssetBundle>prefabs/mahjong_tiles.ab</AssetBundle>
+    <AssetBundle>prefabs/mahjong_effects.ab</AssetBundle>
+    <AssetBundle>prefabs/emojis.ab</AssetBundle>
+  </Game>
+  <Game Name="NiuNiu100">
+    <AssetBundle>niuniu100/main.ab</AssetBundle>
+    <AssetBundle>niuniu100/genre.ab</AssetBundle>
+    <AssetBundle>niuniu100/result.ab</AssetBundle>
+    <AssetBundle>images/main.ab</AssetBundle>
+    <AssetBundle>images/startbet.ab</AssetBundle>
+    <AssetBundle>images/chip.ab</AssetBundle>
+    <AssetBundle>images/pokers.ab</AssetBundle>
+    <AssetBundle>images/rank.ab</AssetBundle>
+    <AssetBundle>prefabs/common.ab</AssetBundle>
+    <AssetBundle>prefabs/niuniu100.ab</AssetBundle>
+    <AssetBundle>prefabs/niuniu100_genres.ab</AssetBundle>
+    <AssetBundle>prefabs/pokers.ab</AssetBundle>
+    <AssetBundle>sounds/niuniu100.ab</AssetBundle>
+  </Game>
+  <Game Name="BiJi">
+    <AssetBundle>biji/room.ab</AssetBundle>
+    <AssetBundle>biji/room_chat.ab</AssetBundle>
+    <AssetBundle>biji/room_disband.ab</AssetBundle>
+    <AssetBundle>biji/room_jiesuan.ab</AssetBundle>
+    <AssetBundle>biji/room_setting.ab</AssetBundle>
+    <AssetBundle>images/chat.ab</AssetBundle>
+    <AssetBundle>images/emojis.ab</AssetBundle>
+    <AssetBundle>images/main.ab</AssetBundle>
+    <AssetBundle>images/pokers.ab</AssetBundle>
+    <AssetBundle>prefabs/biji.ab</AssetBundle>
+    <AssetBundle>prefabs/pokers.ab</AssetBundle>
+    <AssetBundle>prefabs/emojis.ab</AssetBundle>
+    <AssetBundle>sounds/biji.ab</AssetBundle>
+  </Game>
+  <Game Name="Lackey">
+    <AssetBundle>lackey/cards.ab</AssetBundle>
+    <AssetBundle>lackey/common.ab</AssetBundle>
+    <AssetBundle>lackey/effects.ab</AssetBundle>
+    <AssetBundle>lackey/emojis.ab</AssetBundle>
+    <AssetBundle>lackey/hall.ab</AssetBundle>
+    <AssetBundle>lackey/result.ab</AssetBundle>
+    <AssetBundle>lackey/room.ab</AssetBundle>
+    <AssetBundle>lackey/setting.ab</AssetBundle>
+    <AssetBundle>images/chat.ab</AssetBundle>
+    <AssetBundle>images/emojis.ab</AssetBundle>
+    <AssetBundle>prefabs/lackey.ab</AssetBundle>
+    <AssetBundle>prefabs/lackey_cards.ab</AssetBundle>
+    <AssetBundle>prefabs/lackey_effects.ab</AssetBundle>
+    <AssetBundle>sounds/lackey.ab</AssetBundle>
+  </Game>
+</GameManifest>

@@ -1,0 +1,410 @@
+-- 描述：兑换界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.10.25
+
+local base = require 'BehaviourBase';
+local Record = require 'Hall.ExchangeRecord';
+local Account = require 'Hall.ExchangeAccount';
+local DlgPassword = require 'Hall.DlgPassword';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("Frame/Left");
+    local child1 = nil;
+    local child2 = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+        child1 = child:Find("ToggleGroup");
+        if (child1 ~= nil) then
+            child2 = child1:Find("ToggleExchange");
+            if (child2 ~= nil) then
+                ui.AddToggleClick(child2.gameObject, self.OnExchangeCheck);
+            end
+            child2 = child1:Find("ToggleRecord");
+            if (child2 ~= nil) then
+                ui.AddToggleClick(child2.gameObject, self.OnRecordCheck);
+            end
+            child2 = child1:Find("ToggleState");
+            if (child2 ~= nil) then
+                ui.AddToggleClick(child2.gameObject, self.OnStateCheck);
+            end
+        end
+    end
+    child = obj.transform:Find("Frame/Right");
+    if (child ~= nil) then
+        child1 = child:Find("Exchange");
+        if (child1 ~= nil) then
+            self._exchange = child1.gameObject;
+            child2 = child1:Find("Balance2/Text");
+            if (child2 ~= nil) then
+                self._textDeposit = child2.gameObject
+            end
+            child2 = child1:Find("Amount2");
+            if (child2 ~= nil) then
+                self._inputAmount = child2.gameObject
+                ui.SetInputChangeHandler(child2.gameObject, self.OnInputChanged);
+            end
+            child2 = child1:Find("Password2");
+            if (child2 ~= nil) then
+                self._inputPassword = child2.gameObject
+            end
+            child2 = child1:Find("Slider");
+            if (child2 ~= nil) then
+                self._slider = child2.gameObject;
+                ui.SetSliderChangeHandler(child2.gameObject, self.OnSliderChanged);
+            end
+            child2 = child1:Find("Alipay/BtnBind");
+            if (child2 ~= nil) then
+                ui.AddBtnClick(child2.gameObject, self.OnAlipayClick);
+            end
+            child2 = child1:Find("Alipay/Text");
+            if (child2 ~= nil) then
+                self._textAlipay = child2.gameObject;
+            end
+            child2 = child1:Find("Bank/BtnBind");
+            if (child2 ~= nil) then
+                ui.AddBtnClick(child2.gameObject, self.OnBankClick);
+            end
+            child2 = child1:Find("Bank/Text");
+            if (child2 ~= nil) then
+                self._textBank = child2.gameObject;
+            end
+            child2 = child1:Find("ToggleAccount/ToggleAlipay");
+            if (child2 ~= nil) then
+                ui.AddToggleClick(child2.gameObject, self.OnAlipayCheck);
+            end
+            child2 = child1:Find("ToggleAccount/ToggleBank");
+            if (child2 ~= nil) then
+                ui.AddToggleClick(child2.gameObject, self.OnBankCheck);
+            end
+            child2 = child1:Find("BtnExchagne");
+            if (child2 ~= nil) then
+                ui.AddBtnClick(child2.gameObject, self.OnExchangeClick);
+            end
+            child2 = child1:Find("BtnPassword");
+            if (child2 ~= nil) then
+                ui.AddBtnClick(child2.gameObject, self.OnPasswordClick);
+            end
+        end
+        child1 = child:Find("Records");
+        if (child1 ~= nil) then
+            Record.gameObject = child1.gameObject;
+            Record:Awake();
+            self._records = Record;
+        end
+        child1 = child:Find("State");
+        if (child1 ~= nil) then
+            self._state = child1.gameObject;
+        end
+    end
+    child = obj.transform:Find("Frame/BtnClose");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnCloseClick);
+	end
+    child = obj.transform:Find("BindAccount");
+	if (child ~= nil) then
+        Account.gameObject = child.gameObject;
+        Account:Awake();
+		self._bindAccount = Account;
+	end
+    child = obj.transform:Find("BindPassword");
+	if (child ~= nil) then
+        self._dlgPassword = DlgPassword.NewInstance();
+        self._dlgPassword.gameObject = child.gameObject;
+        self._dlgPassword:Awake();
+	end
+    self._page = 1;
+    self._amount = 0;
+    self._type = 0;
+    self._alipay = "";
+    self._bank = "";
+    self.firstShow = true;
+end
+
+function _module:Start()
+    if (self._bindAccount ~= nil) then
+        self._bindAccount:SetOwner(self);
+    end
+    self:Show(false);
+end
+
+function _module:Update()
+    if (self._records ~= nil and self._records:IsVisible()) then
+        self._records:Update();
+    end
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+function _module:OnShowDialog()
+    if (self._textDeposit ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textDeposit, tostring(CS.NiuMa.GameManager.Instance.Deposit));
+    end
+    if (self._records ~= nil) then
+        self._records:OnShowDialog();
+    end
+    if (self.firstShow) then
+        self.firstShow = false;
+        self:UpdateSliderValue();
+        CS.NiuMa.GameManager.Instance:AuthGet("/player/capital/account", self.OnGetAccountRespone);
+    end
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+	self:Show(false);
+end
+
+function _module.OnExchangeCheck(val)
+    if (not val) then
+		return;
+	end
+    local self = _module;
+    self._page = 1;
+    self:OnPageSelected();
+end
+
+function _module.OnRecordCheck(val)
+    if (not val) then
+		return;
+	end
+    local self = _module;
+    self._page = 2;
+    self:OnPageSelected();
+end
+
+function _module.OnStateCheck(val)
+    if (not val) then
+		return;
+	end
+    local self = _module;
+    self._page = 3;
+    self:OnPageSelected();
+end
+
+function _module:OnPageSelected()
+    if (self._exchange ~= nil) then
+        self._exchange:SetActive(self._page == 1);
+    end
+    if (self._records ~= nil) then
+        self._records:Show(self._page == 2);
+    end
+    if (self._state ~= nil) then
+        self._state:SetActive(self._page == 3);
+    end
+end
+
+function _module.OnGetAccountRespone(code, text)
+    if (code ~= 200) then
+        return;
+    end
+    local self = _module;
+    local ui = CS.NiuMa.LuaUGUI;
+    local t = rapidjson.decode(text);
+    if (t.alipayAccount ~= nil) then
+        self._alipay = t.alipayAccount;
+        if (self._textAlipay ~= nil) then
+            ui.SetText(self._textAlipay, t.alipayAccount);
+        end
+    end
+    if (t.bankAccount ~= nil) then
+        self._bank = t.bankAccount;
+        if (self._textBank ~= nil) then
+            ui.SetText(self._textBank, t.bankAccount);
+        end
+    end
+end
+
+function _module.OnBindAccountRespone(code, text)
+    local self = _module;
+    local ui = CS.NiuMa.LuaUGUI;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code ~= 200) then
+        local err;
+        if (t.msg ~= nil) then
+            err = t.msg;
+        else
+            err = text;
+        end
+        gm:ShowPromptTip("绑定账号失败：" .. err, 2.0);
+    else
+        gm:ShowPromptTip("绑定账号成功", 2.0);
+        if (t.alipayAccount ~= nil) then
+            if (self._textAlipay ~= nil) then
+                ui.SetText(self._textAlipay, t.alipayAccount);
+            end
+        end
+        if (t.bankAccount ~= nil) then
+            if (self._textBank ~= nil) then
+                ui.SetText(self._textBank, t.bankAccount);
+            end
+        end
+    end
+end
+
+function _module.OnInputChanged(text)
+    local self = _module;
+    if (self._ignoreInputEvent) then
+        self._ignoreInputEvent = false;
+        return;
+    end
+	local num;
+    if (text ~= nil and #text > 0) then
+        num = math.floor(tonumber(text));
+    end
+	if (num == nil) then
+		return;
+	end
+    self._amount = num;
+    self:UpdateSliderValue();
+end
+
+function _module:UpdateSliderValue()
+    if (self._slider == nil) then
+        return;
+    end
+    local max = CS.NiuMa.GameManager.Instance.Deposit;
+    local val = self._amount;
+    if (val < 0) then
+        val = 0;
+    elseif (val > max) then
+        val = max;
+    end
+    if (max > 0) then
+        val = val / max;
+    else
+        val = 0;
+    end
+    self._ignoreSliderEvent = true;
+    CS.NiuMa.LuaUGUI.SetSliderValue(self._slider, val);
+end
+
+function _module.OnSliderChanged(val)
+    local self = _module;
+    if (self._ignoreSliderEvent) then
+        self._ignoreSliderEvent = false;
+        return;
+    end
+    local max = CS.NiuMa.GameManager.Instance.Deposit;
+    self._amount = math.floor(max * val + 0.5);
+    if (self._inputAmount ~= nil) then
+        self._ignoreInputEvent = true;
+        CS.NiuMa.LuaUGUI.SetInputText(self._inputAmount, tostring(self._amount));
+    end
+end
+
+function _module.OnAlipayClick()
+    local self = _module;
+    if (self._bindAccount ~= nil) then
+        self._bindAccount:Show(true);
+        self._bindAccount:Clear();
+        self._bindAccount:SetType(0);
+    end
+end
+
+function _module.OnBankClick()
+    local self = _module;
+    if (self._bindAccount ~= nil) then
+        self._bindAccount:Show(true);
+        self._bindAccount:Clear();
+        self._bindAccount:SetType(1);
+    end
+end
+
+function _module.OnAlipayCheck(val)
+    if (not val) then
+		return;
+	end
+    local self = _module;
+    self._type = 0;
+end
+
+function _module.OnBankCheck(val)
+    if (not val) then
+		return;
+	end
+    local self = _module;
+    self._type = 1;
+end
+
+function _module.OnExchangeClick()
+    local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    if (self._amount < 50) then
+        gm:ShowPromptTip("兑换数量不能低于50金币", 2.0);
+        return;
+    end
+    local tmp = self._amount % 50;
+    if (tmp ~= 0) then
+        gm:ShowPromptTip("兑换数量必须为50的整数倍", 2.0);
+        return;
+    end
+    if (self._type == 0 and (self._alipay == nil or #(self._alipay) == 0)) then
+        gm:ShowPromptTip("未绑定支付宝账号", 2.0);
+        return;
+    end
+    if (self._type == 1 and (self._bank == nil or #(self._bank) == 0)) then
+        gm:ShowPromptTip("未绑定银行账号", 2.0);
+        return;
+    end
+    local text = "您申请兑换" .. tostring(self._amount) .. "金币，将从您的银行冻结相应数量的金币，待审核通过后资金将转到您指定的账户。";
+	gm:ShowPromptDialog(text, self.DoExchange);
+end
+
+function _module.DoExchange()
+    local self = _module;
+    local t = {};
+    local pwd = "";
+    if (self._inputPassword ~= nil) then
+        pwd = CS.NiuMa.LuaUGUI.GetInputText(self._inputPassword);
+    end
+    if (pwd ~= nil and #pwd > 0) then
+        t.password = CS.NiuMa.AesUtil.Encrypt(pwd);
+    end
+    t.amount = self._amount;
+    t.type = self._type;
+    local body = rapidjson.encode(t);
+    CS.NiuMa.GameManager.Instance:AuthPost("/player/capital/exchange", body, self.OnExchangeRespone);
+end
+
+function _module.OnExchangeRespone(code, text)
+    local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code ~= 200) then
+        local err;
+        if (t.msg ~= nil) then
+            err = t.msg;
+        else
+            err = text;
+        end
+        gm:ShowPromptTip("申请兑换失败：" .. err, 2.0);
+    else
+        gm.Deposit = t.deposit;
+        if (self._textDeposit ~= nil) then
+            CS.NiuMa.LuaUGUI.SetText(self._textDeposit, tostring(t.deposit));
+        end
+        gm:ShowPromptTip("申请兑换成功", 2.0);
+    end
+end
+
+function _module.OnPasswordClick()
+    local self = _module;
+    if (self._dlgPassword ~= nil) then
+        self._dlgPassword:Show(true);
+        self._dlgPassword:Clear();
+    end
+end
+
+return _module;

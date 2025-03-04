@@ -1,0 +1,200 @@
+-- 描述：百人牛牛创建房间界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.18
+
+local base = require 'BehaviourBase';
+local com_def = require 'Common.Defines';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Frame");
+	local child1 = nil;
+	local child2 = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+		child1 = child:Find("BtnClose");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnCloseClick);
+		end
+        child1 = child:Find("ToggleType");
+		if (child1 ~= nil) then
+			child2 = child1:Find("TogglePublic");
+			if (child2 ~= nil) then
+				ui.AddToggleClick(child2.gameObject, self.OnPublicChanged);
+			end
+			child2 = child1:Find("TogglePrivate");
+			if (child2 ~= nil) then
+				ui.AddToggleClick(child2.gameObject, self.OnPrivateChanged);
+			end
+		end
+        child1 = child:Find("Gold1/TextGold");
+        if (child1 ~= nil) then
+            self._textGold = child1.gameObject;
+        end
+        child1 = child:Find("Gold2");
+        if (child1 ~= nil) then
+            self._inputDeposit = child1.gameObject;
+            ui.SetInputChangeHandler(child1.gameObject, self.OnInputChanged);
+        end
+		child1 = child:Find("Password");
+        if (child1 ~= nil) then
+            self._inputPassword = child1.gameObject;
+        end
+        child1 = child:Find("Slider");
+        if (child1 ~= nil) then
+            self._slider = child1.gameObject;
+            ui.SetSliderChangeHandler(child1.gameObject, self.OnSliderChanged);
+        end
+		child1 = child:Find("BtnCreate");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnCreateClick);
+		end
+    end
+    self._public = 1;
+    self._gold = 0;
+    self._minDeposit = 200000;    --最低押金数额
+    self._deposit = self._minDeposit;
+end
+
+function _module:Start()
+    local gm = CS.NiuMa.GameManager.Instance;
+    self._gold = gm.Gold;
+    if (self._textGold ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textGold, tostring(self._gold));
+    end
+    self:UpdateSliderValue();
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:Clear()
+	if (self._inputPassword ~= nil) then
+		CS.NiuMa.LuaUGUI.SetInputText(self._inputPassword, "");
+	end
+end
+
+function _module:SetHall(hall)
+	self._hall = hall;
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+	self:Show(false);
+end
+
+function _module.OnPublicChanged(val)
+	if (not val) then
+		return;
+	end
+    local self = _module;
+	self._public = 1;
+end
+
+function _module.OnPrivateChanged(val)
+	if (not val) then
+		return;
+	end
+    local self = _module;
+	self._public = 0;
+end
+
+function _module.OnInputChanged(text)
+    local self = _module;
+    if (self._ignoreInputEvent) then
+        self._ignoreInputEvent = false;
+        --print("Ignore Input Event!");
+        return;
+    end
+    --print("text:"..text);
+	local dep = tonumber(text);
+	if (dep == nil) then
+		return;
+	end
+    self._deposit = dep;
+    --print("deposit"..tostring(self._deposit));
+    self:UpdateSliderValue();
+end
+
+function _module:UpdateSliderValue()
+    if (self._slider == nil) then
+        return;
+    end
+    local max = self._gold;
+    local val = self._deposit;
+    if (max < self._minDeposit) then
+        max = self._minDeposit;
+    end
+    if (val < self._minDeposit) then
+        val = self._minDeposit;
+    elseif (val > max) then
+        val = max;
+    end
+    local range = max - self._minDeposit;
+    if (range > 0) then
+        local delta = val - self._minDeposit;
+        val = delta / range;
+    else
+        val = 0;
+    end
+    self._ignoreSliderEvent = true;
+    CS.NiuMa.LuaUGUI.SetSliderValue(self._slider, val);
+end
+
+function _module.OnSliderChanged(val)
+    local self = _module;
+    if (self._ignoreSliderEvent) then
+        self._ignoreSliderEvent = false;
+        --print("Ignore Slider Event!");
+        return;
+    end
+    --print("Slider value:" .. tostring(val));
+    local max = self._gold;
+    if (max < self._minDeposit) then
+        max = self._minDeposit;
+    end
+    local range = max - self._minDeposit;
+    self._deposit = self._minDeposit + math.floor(range * val + 0.5);
+    if (self._inputDeposit ~= nil) then
+        self._ignoreInputEvent = true;
+        CS.NiuMa.LuaUGUI.SetInputText(self._inputDeposit, tostring(self._deposit));
+    end
+end
+
+function _module.OnCreateClick()
+    local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+	if (self._deposit < self._minDeposit) then
+		gm:ShowPromptDialog("奖池押金不能低于20万金币");
+		return;
+	end
+	if (self._deposit > self._gold) then
+		gm:ShowPromptDialog("金币不足");
+		return;
+	end
+	local text = "确定要创建房间吗？将扣除" .. tostring(self._deposit) .. "金币作为房间奖池押金";
+	gm:ShowPromptDialog(text, self.CreateRoomImpl);
+end
+
+function _module.CreateRoomImpl()
+    local self = _module;
+    local msg = {};
+    msg.gameType = com_def.GameType.NiuNiu100;
+    local t = {};
+    t.deposit = self._deposit;
+    t.isPublic = self._public;
+    local util = CS.NiuMa.Utility;
+	local text = rapidjson.encode(t);
+	msg.base64 = util.EncodeBase64(text);
+	local body = rapidjson.encode(msg);
+	CS.NiuMa.GameManager.Instance:AuthPost("/player/game/create", body, self._hall.OnCreateResponse);
+    self:Show(false);
+end
+
+return _module;

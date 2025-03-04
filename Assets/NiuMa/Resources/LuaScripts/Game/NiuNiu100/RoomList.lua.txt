@@ -1,0 +1,112 @@
+-- 描述：公开房列表脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.26
+
+local base = require 'BehaviourBase';
+local CommonUtils = require 'Common.CommonUtils';
+local RoomItem = require "Game.NiuNiu100.RoomItem";
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    self._itemList = {};
+    local child = obj.transform:Find("Viewport/Content");
+    if (child ~= nil) then
+        self._itemParent = child;
+    end
+    --当前是否正在请求列表数据
+    self._requesting = false;
+    self._refreshElapsed = 0.0;
+end
+
+function _module:Start()
+    self:RefreshList();
+end
+
+function _module:Update()
+    self._refreshElapsed = self._refreshElapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+	if (self._refreshElapsed > 10.0) then
+        self._refreshElapsed = 0.0;
+        if (CommonUtils.IsStringNotEmpty(CS.NiuMa.GameManager.Instance.VenueId)) then
+			--当前已经进入房间，不需要更新公开房列表
+			return;
+		end
+        self:RefreshList();
+    end
+end
+
+function _module:SetEmptyTip(obj)
+    self._emptyTip = obj;
+end
+
+function _module:SetEnterCallback(callback)
+    self._enterCallback = callback;
+end
+
+function _module:RefreshList()
+    if (self._requesting) then
+        return;
+    end
+	local gm = CS.NiuMa.GameManager.Instance;
+    gm:AuthGet("/player/game/niu100/public", self.OnGetRoomsResponse);
+    self._requesting = true;
+end
+
+function _module.OnGetRoomsResponse(code, text)
+    local self = _module;
+    self._requesting = false;
+    if (code ~= 200) then
+		return;
+	end
+    local rm = CS.NiuMa.ResourceManager.Instance;
+    local prefab = rm:LoadResource("Prefabs/Game/NiuNiu100/RoomItem", "prefabs/niuniu100.ab", "Assets/NiuMa/Resources/", ".prefab");
+    if (prefab == nil) then
+        return;
+    end
+    local GameObject = CS.UnityEngine.GameObject;
+    local t = rapidjson.decode(text);
+    local items = t.items;
+    local nums1 = #items;
+    local tmpList = {};
+    local item = nil;
+    local obj = nil;
+    if (self._emptyTip ~= nil) then
+        self._emptyTip:SetActive(nums1 < 1);
+    end
+    for i = 1, nums1 do
+        item = self._itemList[i];
+        if (item == nil) then
+            obj = GameObject.Instantiate(prefab, self._itemParent);
+            if (obj ~= nil) then
+                item = RoomItem.NewInstance();
+                item.gameObject = obj;
+                item:Awake();
+                item:SetEnterCallback(self._enterCallback);
+                item:SetRoomItem(items[i]);
+            else
+                return;
+            end
+        else
+            item:SetRoomItem(items[i]);
+        end
+        table.insert(tmpList, item);
+    end
+    --删除多余项
+    local nums2 = #(self._itemList);
+    for i = nums1 + 1, nums2 do
+        local item = self._itemList[i];
+        obj = nil;
+        if (item ~= nil) then
+            obj = item.gameObject;
+        end
+        if (obj ~= nil) then
+            GameObject.Destroy(obj);
+        end
+    end
+    self._itemList = tmpList;
+end
+
+return _module;

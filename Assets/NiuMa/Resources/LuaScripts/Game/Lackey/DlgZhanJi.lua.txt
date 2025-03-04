@@ -1,0 +1,193 @@
+-- 描述：狗腿战绩对话框界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.05
+
+local base = require 'BehaviourBase';
+local ZhanJiRecord = require 'Game.Lackey.ZhanJiRecord';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Frame/Title");
+    local child1 = nil;
+    local child2 = nil;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+        child1 = child:Find("BtnClose");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnCloseClick);
+        end
+    end
+    child = obj.transform:Find("Frame/Back");
+    if (child ~= nil) then
+        child1 = child:Find("Page");
+        if (child1 ~= nil) then
+            child2 = child1:Find("BtnPrev");
+            if (child2 ~= nil) then
+                self._btnPrev = child2.gameObject;
+                ui.AddBtnClick(child2.gameObject, self.OnPrevClick);
+            end
+            child2 = child1:Find("BtnNext");
+            if (child2 ~= nil) then
+                self._btnNext = child2.gameObject;
+                ui.AddBtnClick(child2.gameObject, self.OnNextClick);
+            end
+            child2 = child1:Find("BtnPrev1");
+            if (child2 ~= nil) then
+                self._btnPrev1 = child2.gameObject;
+            end
+            child2 = child1:Find("BtnNext1");
+            if (child2 ~= nil) then
+                self._btnNext1 = child2.gameObject;
+            end
+            child2 = child1:Find("Num/Text");
+            if (child2 ~= nil) then
+                self._textPage = child2.gameObject;
+            end
+        end
+        self._records = {};
+        for i = 1, 5 do
+            child1 = child:Find("Record" .. i);
+            if (child1 ~= nil) then
+                self._records[i] = ZhanJiRecord.NewInstance();
+                self._records[i].gameObject = child1.gameObject;
+                self._records[i]:Awake();
+            end
+        end
+    end
+    --当前页
+    self._page = 1;
+    --总页数
+    self._totalPage = 0;
+    self._requesting = false;
+    self._headTextures = {};
+end
+
+function _module:Start()
+    for i = 1, 5 do
+        if (self._records[i] ~= nil) then
+            self._records[i]:SetZhanJi(self);
+            self._records[i]:Start();
+        end
+    end
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:OnShowDialog()
+    if (self._page == 1) then
+        self:RequestPage(1);
+    end
+end
+
+function _module.OnCloseClick()
+    local self = _module;
+    self:Show(false);
+end
+
+function _module.OnPrevClick()
+    local self = _module;
+    if (self._page <= 1) then
+        --当前已经是第一页，不能再请求上一页
+        return;
+    end
+    self:RequestPage(self._page - 1);
+end
+
+function _module.OnNextClick()
+    local self = _module;
+    if (self._page >= self._totalPage) then
+        -- 当前已是最后一页不能再请求下一页
+        return;
+    end
+    self:RequestPage(self._page + 1);
+end
+
+function _module:UpdatePageText()
+    if (self._btnPrev ~= nil) then
+        self._btnPrev:SetActive(self._page > 1);
+    end
+    if (self._btnPrev1 ~= nil) then
+        self._btnPrev1:SetActive(self._page < 2);
+    end
+    if (self._btnNext ~= nil) then
+        self._btnNext:SetActive(self._page < self._totalPage);
+    end
+    if (self._btnNext1 ~= nil) then
+        self._btnNext1:SetActive(self._page > (self._totalPage - 1));
+    end
+    local text = "";
+    if (self._totalPage > 0) then
+        text = tostring(self._page) .. "/" .. tostring(self._totalPage);
+    end
+    if (self._textPage ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textPage, text);
+    end
+end
+
+-- 请求页面
+function _module:RequestPage(page)
+    if (self._requesting) then
+        -- 当前正在请求数据，但是数据还没有返回，直接退出
+        return;
+    end
+    local t = {};
+    t.pageNum = page;
+    t.pageSize = 5;
+    local body = rapidjson.encode(t);
+    local gm = CS.NiuMa.GameManager.Instance;
+    gm:AuthPost("/player/game/lackey/record", body, self.OnGetLackeyRecord);
+    self._requesting = true;
+end
+
+function _module.OnGetLackeyRecord(code, text)
+    local self = _module;
+    self._requesting = false;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code == 200) then
+        self._page = t.pageNum;
+        self._totalPage = math.ceil(t.total / 5);
+        self:UpdatePageText();
+        local nums = 0;
+        if (t.records ~= nil and t.records ~= rapidjson.null) then
+            nums = #(t.records);
+        end
+        for i = 1, nums do
+            if (self._records[i] ~= nil) then
+                local record = t.records[i];
+                self._records[i]:Show(true);
+                self._records[i]:SetRecord(record);
+            end
+        end
+        for i = nums + 1, 5 do
+            if (self._records[i] ~= nil) then
+                self._records[i]:Show(false);
+            end
+        end
+    else
+        local msg = t.msg;
+        if (msg == nil or #msg == 0) then
+            msg = text;
+        end
+        msg = "请求游戏记录失败：" .. msg;
+        gm:ShowPromptTip(msg, 2.0);
+    end
+end
+
+function _module:GetHeadTextureByUrl(url)
+    local tex = self._headTextures[url];
+    return tex;
+end
+
+function _module:AddHeadTexture(url, tex)
+    self._headTextures[url] = tex;
+end
+
+return _module;

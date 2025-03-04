@@ -1,0 +1,355 @@
+-- 描述：逮狗腿打出牌脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.07
+
+local base = require 'BehaviourBase';
+local CardGenerator = require 'Game.Lackey.CardGenerator';
+local Vector2 = CS.UnityEngine.Vector2;
+local Vector3 = CS.UnityEngine.Vector3;
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("BuYaos");
+    local child1 = nil;
+    self._buYaos = {};
+    self._buYaoAnimators = {};
+    if (child ~= nil) then
+        for i = 1, 5 do
+            child1 = child:Find("BuYao" .. i);
+            if (child1 ~= nil) then
+                self._buYaos[i] = child1.gameObject;
+                child1 = child1:Find("Image");
+                if (child1 ~= nil) then
+                    self._buYaoAnimators[i] = child1.gameObject:GetComponent("Animator");
+                end
+            end
+        end
+    end
+    child = obj.transform:Find("OuttedCards1");
+    if (child ~= nil) then
+        self._parent1 = child;
+    end
+    child = obj.transform:Find("OuttedCards2");
+    if (child ~= nil) then
+        self._parent2 = child;
+    end
+	child = obj.transform:Find("Effects");
+    if (child ~= nil) then
+        self._effectParent = child;
+    end
+	child = obj.transform:Find("XiQians");
+    if (child ~= nil) then
+        self._xiQians = child;
+    end
+    self._outtedCards = {};
+    self._outtedCards[1] = {};
+    self._outtedCards[2] = {};
+    self._outtedCards[3] = {};
+    self._outtedCards[4] = {};
+    self._outtedCards[5] = {};
+	self._leftCards = {};
+	self._landlordPrefab = nil;
+end
+
+function _module:Start()
+end
+
+--设置狗腿牌ID
+function _module:SetLackeyCard(id)
+    self._lackeyCard = id;
+end
+
+_module.CardPositions = {};
+_module.CardPositions[1] = Vector2(0.0, -32.0);
+_module.CardPositions[2] = Vector2(400.0, 46.0);
+_module.CardPositions[3] = Vector2(400.0, 200.0);
+_module.CardPositions[4] = Vector2(-400.0, 200.0);
+_module.CardPositions[5] = Vector2(-400.0, 46.0);
+
+function _module.CalcStartCenterX(clientSeat, nums)
+	local x = 0.0;
+    local startX = 0.0;
+	local centerX = 0.0;
+    if (clientSeat == 1) then
+        startX = (1 - nums) * 15.0;
+    elseif (clientSeat == 2 or clientSeat == 3) then
+		x = _module.CardPositions[clientSeat].x;
+        startX = x - (nums - 1) * 30.0;
+		centerX = (startX + x) * 0.5;
+    elseif (clientSeat == 4 or clientSeat == 5) then
+		x = _module.CardPositions[clientSeat].x;
+        startX = x;
+		centerX = x + (nums - 1) * 15.0;
+    end
+    return startX, centerX;
+end
+
+function _module:OnPlayCard(clientSeat, role, xiQian, genre, buYao, realTime, cards)
+    if (buYao) then
+        if (self._buYaos[clientSeat] ~= nil) then
+            self._buYaos[clientSeat]:SetActive(true);
+        end
+        if (realTime and self._buYaoAnimators[clientSeat] ~= nil) then
+            self._buYaoAnimators[clientSeat]:SetTrigger("Spring");
+        end
+    else
+        local nums = #cards;
+        if (nums == 0) then
+            return;
+        end
+        local parent = nil;
+        if (clientSeat == 1) then
+            parent = self._parent1;
+        else
+            parent = self._parent2;
+        end
+        local x, centerX = self.CalcStartCenterX(clientSeat, nums);
+        local y = _module.CardPositions[clientSeat].y;
+        local card = nil;
+        local pos = nil;
+        local obj = nil;
+        for i = 1, nums do
+            card = cards[i];
+            pos = Vector2(x, y);
+            obj = CardGenerator.CreateCard(card.point, card.suit, false, parent, pos);
+			obj.transform.localScale = Vector3(0.65, 0.65, 1.0);
+            table.insert(self._outtedCards[clientSeat], obj);
+            x = x + 30.0;
+            if (card.id == self._lackeyCard) then
+                CardGenerator.CreateLackeyMask(true, false, obj.transform);
+            end
+        end
+        if (role == 0) then
+            self:CreateLandlordMask(obj.transform);
+        elseif (role == 1) then
+            CardGenerator.CreateLackeyMask(false, false, obj.transform);
+        end
+		if (realTime) then
+			if (xiQian > 0) then
+				self:CreateXiQian(clientSeat, xiQian, centerX);
+			end
+			self:CreateEffect(clientSeat, genre, centerX);
+		end
+    end
+end
+
+function _module:CreateXiQian(clientSeat, xiQian, centerX)
+	if (self._xiQians == nil) then
+		return;
+	end
+	if (self._xiQianPrefab == nil) then
+		local prefabName = "Prefabs/Game/Lackey/XiQianTip";
+		self._xiQianPrefab = CS.NiuMa.ResourceManager.Instance:LoadResource(prefabName, "prefabs/lackey.ab", "Assets/NiuMa/Resources/", ".prefab");
+	end
+	if (self._xiQianPrefab == nil) then
+		return;
+	end
+	local obj = CS.UnityEngine.GameObject.Instantiate(self._xiQianPrefab, self._xiQians);
+	local trans = obj:GetComponent("RectTransform");
+	local child = trans:Find("Text");
+	if (child ~= nil) then
+		local text = "喜钱+" .. tostring(xiQian);
+		CS.NiuMa.LuaUGUI.SetText(child.gameObject, text);
+	end
+	local y = _module.CardPositions[clientSeat].y;
+	local Vector2 = CS.UnityEngine.Vector2;
+	trans.anchoredPosition = Vector2(centerX, y - 40.0);
+	local doTween = CS.NiuMa.LuaDOTween;
+	local twMove = doTween.DOAnchorPos(obj, Vector2(centerX, y + 40.0), 0.5);
+	doTween.SetEase(twMove, CS.DG.Tweening.Ease.OutCubic);
+	CS.UnityEngine.GameObject.Destroy(obj, 2.0);
+end
+
+function _module:CreateLandlordMask(parent)
+    if (parent == nil) then
+        return;
+    end
+    if (self._landlordPrefab == nil) then
+        local prefabName = "Prefabs/Game/Lackey/Cards/Big/LandlordMask";
+        self._landlordPrefab = CS.NiuMa.ResourceManager.Instance:LoadResource(prefabName,
+			"prefabs/lackey_cards.ab", "Assets/NiuMa/Resources/", ".prefab");
+    end
+    if (self._landlordPrefab ~= nil) then
+        CS.UnityEngine.GameObject.Instantiate(self._landlordPrefab, parent);
+    end
+end
+
+function _module:CreateEffect(clientSeat, genre, centerX)
+	local prefabName = "";
+	local live = 2.0;
+	local y = -30.0;
+	if (genre < 13 and genre > 2) then
+		-- 连对
+		prefabName = "liandui";
+	elseif (genre < 25 and genre > 13) then
+		-- 3顺
+		prefabName = "3shun";
+	elseif (genre == 25) then
+		-- 3带2
+		prefabName = "3dai2";
+	elseif (genre < 32 and genre > 25) then
+		-- 蝴蝶
+		prefabName = "butterfly";
+		y = 0.0;
+	elseif (genre == 32 or genre == 33) then
+		-- 4炸、5炸
+		prefabName = "bomb_small";
+		live = 0.8;
+		y = 0.0;
+	elseif (genre == 34 or genre == 35 or genre == 41 or genre == 42) then
+		-- 6炸、7炸、3王炸
+		prefabName = "bomb_mid";
+		live = 1.0;
+		y = 0.0;
+	elseif (genre < 50 and genre > 35) then
+		-- 其他更大的炸弹
+		prefabName = "bomb_big";
+		live = 1.0;
+		y = 0.0;
+	else
+		return;
+	end
+	local prefab = nil;
+	if (self._effectPrefabs ~= nil) then
+		prefab = self._effectPrefabs[prefabName];
+	else
+		self._effectPrefabs = {};
+	end
+	if (prefab == nil) then
+		local path = "Prefabs/Game/Lackey/Effects/genre/" .. prefabName;
+		prefab = CS.NiuMa.ResourceManager.Instance:LoadResource(path,
+            "prefabs/lackey_effects.ab", "Assets/NiuMa/Resources/", ".prefab");
+		if (prefab ~= nil) then
+			self._effectPrefabs[prefabName] = prefab;
+		else
+			return;
+		end
+	end
+	y = y + _module.CardPositions[clientSeat].y;
+	local obj = CS.UnityEngine.GameObject.Instantiate(prefab, self._effectParent);
+	if (obj ~= nil) then
+		obj.transform.anchoredPosition = Vector2(centerX, y);
+		CS.UnityEngine.GameObject.Destroy(obj, live);
+	end
+end
+
+function _module:ClearCards(clientSeat)
+    if (self._buYaos[clientSeat] ~= nil) then
+        self._buYaos[clientSeat]:SetActive(false);
+    end
+    if (self._outtedCards[clientSeat] == nil) then
+        return;
+    end
+    local nums = #(self._outtedCards[clientSeat]);
+    if (nums > 0) then
+        for i = 1, nums do
+            local obj = self._outtedCards[clientSeat][i];
+            CS.UnityEngine.GameObject.Destroy(obj);
+        end
+        self._outtedCards[clientSeat] = {};
+    end
+end
+
+function _module:OnCardAlert(clientSeat)
+	local pos = nil;
+	if (clientSeat == 2) then
+		pos = Vector2(420.0, 0.0);
+	elseif (clientSeat == 3) then
+		pos = Vector2(420.0, 200.0);
+	elseif (clientSeat == 4) then
+		pos = Vector2(-420.0, 240.0);
+	elseif (clientSeat == 5) then
+		pos = Vector2(-420.0, 40.0);
+	else
+		return;
+	end
+	local prefabName = "alert";
+	local prefab = nil;
+	if (self._effectPrefabs ~= nil) then
+		prefab = self._effectPrefabs[prefabName];
+	else
+		self._effectPrefabs = {};
+	end
+	if (prefab == nil) then
+		local path = "Prefabs/Game/Lackey/Effects/" .. prefabName;
+		prefab = CS.NiuMa.ResourceManager.Instance:LoadResource(path,
+            "prefabs/lackey_effects.ab", "Assets/NiuMa/Resources/", ".prefab");
+		if (prefab ~= nil) then
+			self._effectPrefabs[prefabName] = prefab;
+		else
+			return;
+		end
+	end
+	local obj = CS.UnityEngine.GameObject.Instantiate(prefab, self._effectParent);
+	if (obj ~= nil) then
+		obj.transform.anchoredPosition = pos;
+		CS.UnityEngine.GameObject.Destroy(obj, 2.0);
+	end
+end
+
+function _module.CalcLeftCardPos(clientSeat, idx, nums)
+	local x = 0.0;
+	local y = 0.0;
+	if (clientSeat == 2 or clientSeat == 3) then
+		x = 520.0;
+	else
+		x = -520.0;
+	end
+	if (clientSeat == 2) then
+		y = 20.0;
+	elseif (clientSeat == 3) then
+		y = 220.0;
+	elseif (clientSeat == 4) then
+		y = 260.0;
+	elseif (clientSeat == 5) then
+		y = 60.0;
+	end
+	local row = math.floor((idx - 1) / 13);
+	local col = (idx - 1) % 13;
+	y = y - row * 50.0;
+	if (clientSeat == 2 or clientSeat == 3) then
+		x = x - col * 30.0;
+	else
+		x = x + col * 30.0;
+	end
+	return Vector2(x, y);
+end
+
+-- 显示剩余手牌
+function _module:CreateLeftCards(clientSeat, cards)
+	if (clientSeat < 1 or clientSeat > 5) then
+		return;
+	end
+	self:ClearCards(clientSeat);
+	if (clientSeat == 1 or cards == nil or #cards == 0) then
+		return;
+	end
+	local nums = #cards;
+	local pos = nil;
+	local obj = nil;
+	local card = nil;
+	for i = 1, nums do
+		card = cards[i];
+		pos = self.CalcLeftCardPos(clientSeat, i, nums);
+		obj = CardGenerator.CreateCard(card.point, card.suit, true, self._parent2, pos);
+		if (card.id == self._lackeyCard) then
+			CardGenerator.CreateLackeyMask(true, true, obj.transform);
+		end
+		table.insert(self._leftCards, obj);
+	end
+end
+
+function _module:ClearLeftCards()
+	local nums = #(self._leftCards);
+	local GameObject = CS.UnityEngine.GameObject;
+	for i = 1, nums do
+		local obj = self._leftCards[i];
+        GameObject.Destroy(obj);
+	end
+	self._leftCards = {};
+end
+
+return _module;

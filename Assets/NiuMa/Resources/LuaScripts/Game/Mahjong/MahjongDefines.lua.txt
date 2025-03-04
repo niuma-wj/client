@@ -1,0 +1,110 @@
+-- 描述：麻将定义模块
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.10
+
+local _module = {};
+
+_module.MahjongPattern = {};
+_module.MahjongPattern.Invalid = 0;
+_module.MahjongPattern.Tong = 1;       -- 筒子
+_module.MahjongPattern.Tiao = 2;       -- 条子
+_module.MahjongPattern.Wan = 3;        -- 万子
+_module.MahjongPattern.Dong = 4;       -- 东风
+_module.MahjongPattern.Nan = 5;        -- 南风
+_module.MahjongPattern.Xi = 6;         -- 西风
+_module.MahjongPattern.Bei = 7;        -- 北风
+_module.MahjongPattern.Zhong = 8;      -- 红中
+_module.MahjongPattern.Fa = 9;         -- 发财
+_module.MahjongPattern.Bai = 10;       -- 白板
+_module.MahjongPattern.Chun = 11;      -- 春
+_module.MahjongPattern.Xia = 12;       -- 夏
+_module.MahjongPattern.Qiu = 13;       -- 秋
+_module.MahjongPattern.Winter = 14;    -- 冬
+_module.MahjongPattern.Mei = 15;       -- 梅
+_module.MahjongPattern.Lan = 16;       -- 兰
+_module.MahjongPattern.Ju = 17;        -- 菊
+_module.MahjongPattern.Zhu = 18;	   -- 竹
+
+_module.MahjongNumber = {};
+_module.MahjongNumber.Invalid = 0;    -- 无效
+_module.MahjongNumber.Yi = 1;         -- 1
+_module.MahjongNumber.Er = 2;         -- 2
+_module.MahjongNumber.San = 3;        -- 3
+_module.MahjongNumber.Si = 4;         -- 4
+_module.MahjongNumber.Wu = 5;         -- 5
+_module.MahjongNumber.Liu = 6;        -- 6
+_module.MahjongNumber.Qi = 7;         -- 7
+_module.MahjongNumber.Ba = 8;         -- 8
+_module.MahjongNumber.Jiu = 9;		  -- 9
+
+_module.MahjongChapter = {};
+_module.MahjongChapter.Invalid = 0;
+_module.MahjongChapter.Chi = 1;
+_module.MahjongChapter.Peng = 2;
+_module.MahjongChapter.ZhiGang = 3;
+_module.MahjongChapter.JiaGang = 4;
+_module.MahjongChapter.AnGang = 5;
+
+_module.MahjongAction = {};
+_module.MahjongAction.Invalid = 0;
+_module.MahjongAction.Fetch = 1;
+_module.MahjongAction.Play = 2;
+_module.MahjongAction.Chi = 3;
+_module.MahjongAction.Peng = 4;
+_module.MahjongAction.ZhiGang = 5;
+_module.MahjongAction.JiaGang = 6;
+_module.MahjongAction.AnGang = 7;
+_module.MahjongAction.DianPao = 8;
+_module.MahjongAction.ZiMo = 9;
+
+_module.HuStyle = {};
+_module.HuStyle.Invalid = 0;
+_module.HuStyle.PingHu = 1;
+_module.HuStyle.DanDiao = 3;
+_module.HuStyle.BianZhang = 5;
+_module.HuStyle.KaZhang = 9;
+_module.HuStyle.PengPengHu = 17;
+_module.HuStyle.PingHuAll = 31;
+_module.HuStyle.QingYiSe = 32;
+_module.HuStyle.ZiYiSe = 64;
+_module.HuStyle.QiXiaoDui = 128;
+_module.HuStyle.QiXiaoDui1 = 384;
+_module.HuStyle.QiXiaoDui2 = 640;
+_module.HuStyle.QiXiaoDui3 = 1152;
+_module.HuStyle.QiXiaoDuiAll = 1920;
+_module.HuStyle.ShiSanYao = 2048;
+_module.HuStyle.ShiSanLan = 4096;
+_module.HuStyle.QiXingShiSanLan = 12288;
+
+_module.HuWay = {};
+_module.HuWay.Invalid = 0;
+_module.HuWay.ZiMo = 1;
+_module.HuWay.DianPao = 2;
+_module.HuWay.MenQing = 4;
+_module.HuWay.QuanQiuRen = 8;
+_module.HuWay.QuanQiuPao = 18;
+_module.HuWay.QuanQiuAll = 26;
+_module.HuWay.TianHu = 33;
+_module.HuWay.DiHu = 66;
+_module.HuWay.RenHu = 128;
+_module.HuWay.HaiDiLaoYue = 257;
+_module.HuWay.HaiDiPao = 514;
+_module.HuWay.MingGang = 1024;
+_module.HuWay.GangShangHua1 = 2049;
+_module.HuWay.GangShangHua2 = 4097;
+_module.HuWay.GangShangHua3 = 8193;
+_module.HuWay.GangShangHua4 = 16385;
+_module.HuWay.GangShangHuaAll = 30721;
+_module.HuWay.GangShangPao1 = 32770;
+_module.HuWay.GangShangPao2 = 65538;
+_module.HuWay.GangShangPao3 = 131074;
+_module.HuWay.GangShangPao4 = 262146;
+_module.HuWay.GangShangPaoAll = 491522;
+_module.HuWay.QiangGangHu1 = 524290;
+_module.HuWay.QiangGangHu2 = 1048578;
+_module.HuWay.QiangGangHu3 = 2097154;
+_module.HuWay.QiangGangHu4 = 4194306;
+_module.HuWay.QiangGangHuAll = 7864322;
+
+return _module;

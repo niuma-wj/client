@@ -1,0 +1,72 @@
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	self._imgSel = obj:GetComponent("ImageSelector");
+end
+
+function _module:SetFace(idx)
+	if (self._imgSel ~= nil) then
+		self._imgSel:SetSprite(idx);
+	end
+end
+
+function _module:SetOwner(owner)
+    self._owner = owner;
+end
+
+function _module:SetID(id)
+    self._id = id;
+end
+
+function _module:SetEffect(eff)
+	self._effect = eff;
+end
+
+function _module:SetThrower(clientSeat)
+	self._thrower = clientSeat;
+end
+
+--投掷特效
+function _module:ThrowEffect(startPoint, endPoint, prefab, live)
+    local rcTrans = self.gameObject:GetComponent("RectTransform");
+    if (rcTrans == nil) then
+        return;
+    end
+    rcTrans.anchoredPosition = startPoint;
+    local doTween = CS.NiuMa.LuaDOTween;
+    local tweener = doTween.DOAnchorPos(self.gameObject, endPoint, 1.0);
+    doTween.OnComplete(tweener, self:OnMoveEnd());
+	self._endPoint = endPoint;
+    self._prefab = prefab;
+    self._live = live;
+end
+
+function _module:OnMoveEnd()
+    local inst = self;
+    return function()
+        local self = inst;
+        if (self._owner ~= nil) then
+            self._owner:OnShipEffect(self._id, self._effect, self._thrower);
+        end
+        local GameObject = CS.UnityEngine.GameObject;
+        if (self._prefab ~= nil) then
+            local parent = self.gameObject.transform.parent;
+            local obj = GameObject.Instantiate(self._prefab, parent);
+		    obj.transform.anchoredPosition = self._endPoint;
+            GameObject.Destroy(obj, self._live);
+        end
+        GameObject.Destroy(self.gameObject);
+    end
+end
+
+--因为EffectShip被多个地方引用到，而每个引用的地方必须有独立的EffectShip实例，因此外部不能直接引用_module，
+--而是调用NewInstance函数创建实例
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

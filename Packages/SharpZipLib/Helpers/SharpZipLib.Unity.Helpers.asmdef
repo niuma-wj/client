@@ -1,0 +1,17 @@
+{
+    "name": "SharpZipLib.Unity.Helpers",
+    "rootNamespace": "SharpZipLib.Unity.Helpers",
+    "references": [
+        "GUID:91018aa887077a148a9037b4dfd0338a",
+        "GUID:6f099b00ee0d34f4eb8ef168f15e5087"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

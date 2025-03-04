@@ -1,0 +1,185 @@
+-- 描述：逮狗腿解散界面
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.05
+
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child = obj.transform:Find("Frame/Bottom");
+	local child1 = child:Find("TextDescription");
+	if (child1 ~= nil) then
+		self._description = child1.gameObject;
+	end
+	self._names = {};
+	self._choices = {};
+	for i = 1, 4 do
+		child1 = child:Find("TextName" .. i);
+		if (child1 ~= nil) then
+			self._names[i] = child1.gameObject;
+		end
+		child1 = child:Find("TextChoice" .. i);
+		if (child1 ~= nil) then
+			self._choices[i] = child1.gameObject;
+		end
+	end
+	child1 = child:Find("Clock/Text");
+	if (child1 ~= nil) then
+		self._textCountdown = child1.gameObject;
+	end
+	child1 = child:Find("BtnAgree");
+    local ui = CS.NiuMa.LuaUGUI;
+	if (child1 ~= nil) then
+		self._btnAgree = child1.gameObject;
+		ui.AddBtnClick(child1.gameObject, self.OnAgreeClick);
+	end
+	child1 = child:Find("BtnAgree1");
+	if (child1 ~= nil) then
+		self._btnAgree1 = child1.gameObject;
+	end
+	child1 = child:Find("BtnRefuse");
+	if (child1 ~= nil) then
+		self._btnRefuse = child1.gameObject;
+		ui.AddBtnClick(child1.gameObject, self.OnRefuseClick);
+	end
+	child1 = child:Find("BtnRefuse1");
+	if (child1 ~= nil) then
+		self._btnRefuse1 = child1.gameObject;
+	end
+end
+
+function _module:Start()
+	--self.gameObject:SetActive(false);
+end
+
+function _module:Update()
+    if (not self._countingdown) then
+        return;
+    end
+    self._countdown = self._countdown - CS.UnityEngine.Time.unscaledDeltaTime;
+    if (self._countdown > 0) then
+        local sec = math.floor(self._countdown + 0.5);
+        if (self._textCountdown ~= nil) then
+            CS.NiuMa.LuaUGUI.SetText(self._textCountdown, tostring(sec));
+        end
+    else
+        self._countingdown = false;
+    end
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+function _module.OnAgreeClick()
+    --[[
+    local msg = bd_pb.NetMsgInt();
+	msg.Val = 1;
+	local pb_data = msg:SerializeToString();
+    LuaGameUtilities.SendTableMessage("PT_DISBAND_CHOICE", "NetMsgInt", pb_data);
+    --]]
+end
+
+function _module.OnRefuseClick()
+    --[[
+    local msg = bd_pb.NetMsgInt();
+	msg.Val = 2;
+	local pb_data = msg:SerializeToString();
+    LuaGameUtilities.SendTableMessage("PT_DISBAND_CHOICE", "NetMsgInt", pb_data);
+    --]]
+end
+
+-- mySeat为本机玩家在服务器的座位号
+function _module:OnDisbandVote(msg, names, mySeat)
+	local disbander = msg.disbander;
+	local elapsed = msg.elapsed;
+    local choices = msg.choices;
+    local text = "";
+    local ui = CS.NiuMa.LuaUGUI;
+    if (self._description ~= nil) then
+        if (disbander == mySeat) then
+            text = "您请求解散房间，正在等待其他玩家投票解散，超半数玩家同意即可解散。5分钟不操作，默认同意。"
+        else
+            text = "玩家【" .. names[disbander + 1] .. "】请求解散房间，正在等待其他玩家投票解散，超半数玩家同意即可解散。5分钟不操作，默认同意。"
+        end
+        ui.SetText(self._description, text);
+    end
+    local nums = 1;
+    local Color = CS.UnityEngine.Color;
+    for i = 1, 5 do
+        if (i ~= (disbander + 1)) then
+            if (self._names[nums] ~= nil) then
+                ui.SetText(self._names[nums], names[i]);
+            end
+            if (self._choices[nums] ~= nil) then
+                if (choices[i] == 1) then
+                    ui.SetText(self._choices[nums], "同意");
+                    ui.SetTextColor(self._choices[nums], Color(0.0, 0.5, 0.0, 1.0));
+                elseif (choices[i] == 2) then
+                    ui.SetText(self._choices[nums], "拒绝");
+                    ui.SetTextColor(self._choices[nums], Color(0.5, 0.0, 0.0, 1.0));
+                else
+                    ui.SetText(self._choices[nums], "等待选择");
+                    ui.SetTextColor(self._choices[nums], Color(0.5, 0.5, 0.5, 1.0));
+                end
+            end
+            nums = nums + 1;
+        end
+    end
+    self._disbander = disbander;
+    self._countdown = 300 - (elapsed / 1000);
+    self._countingdown = true;
+    if (self._btnAgree ~= nil) then
+        self._btnAgree:SetActive(choices[mySeat + 1] == 0);
+    end
+    if (self._btnAgree1 ~= nil) then
+        self._btnAgree1:SetActive(choices[mySeat + 1] ~= 0);
+    end
+    if (self._btnRefuse ~= nil) then
+        self._btnRefuse:SetActive(choices[mySeat + 1] == 0);
+    end
+    if (self._btnRefuse1 ~= nil) then
+        self._btnRefuse1:SetActive(choices[mySeat + 1] ~= 0);
+    end
+end
+
+function _module:OnDisbandChoice(seat, mySeat, choice)
+    local tmp = seat + 1;
+    if (seat > self._disbander) then
+        tmp = tmp - 1;
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    if (self._choices[tmp] ~= nil) then
+        if (choice == 1) then
+            ui.SetText(self._choices[tmp], "同意");
+            ui.SetTextColor(self._choices[tmp], Color(0.0, 0.5, 0.0, 1.0));
+        else
+            ui.SetText(self._choices[tmp], "拒绝");
+            ui.SetTextColor(self._choices[tmp], Color(0.5, 0.0, 0.0, 1.0));
+        end
+    end
+    if (seat == mySeat) then
+        if (self._btnAgree ~= nil) then
+            self._btnAgree:SetActive(false);
+        end
+        if (self._btnAgree1 ~= nil) then
+            self._btnAgree1:SetActive(true);
+        end
+        if (self._btnRefuse ~= nil) then
+            self._btnRefuse:SetActive(false);
+        end
+        if (self._btnRefuse1 ~= nil) then
+            self._btnRefuse1:SetActive(true);
+        end
+    end
+end
+
+return _module;

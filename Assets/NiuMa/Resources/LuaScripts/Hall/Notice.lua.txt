@@ -1,0 +1,71 @@
+-- 描述：广播通知界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.10.25
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    self._right = 448.0;
+    self._left = -448.0;
+    self._speed = 50.0;
+    self._notices = {};
+    self._texts = {};
+end
+
+function _module:Update()
+    local notice = nil;
+    local nums = #(self._notices);
+    local i = 1;
+    while (i <= nums) do
+        notice = self._notices[i];
+        notice._elapsed = notice._elapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+        notice._posX = self._right - notice._elapsed * self._speed;
+        if (notice._width == nil) then
+            local width, height = CS.NiuMa.LuaUGUI.GetTextPreferredSize(notice._object, 0, 0);
+            notice._width = width;
+        end
+        if (notice._posX < (self._left - notice._width)) then
+            CS.UnityEngine.GameObject.Destroy(notice._object);
+            table.remove(self._notices, i);
+            nums = nums - 1;
+        else
+            local trans = notice._object.transform;
+            trans.anchoredPosition = CS.UnityEngine.Vector2(notice._posX, 0.0);
+            i = i + 1;
+        end
+    end
+    local cut = #(self._texts);
+    if (cut < 1) then
+        return;
+    end
+    local pos = self._right - 1;
+    if (nums > 0) then
+        notice = self._notices[nums];
+        pos = notice._posX + notice._width + 100;
+    end
+    if (pos < self._right) then
+        local prefabName = "Prefabs/NoticeText";
+        local prefab = CS.NiuMa.ResourceManager.Instance:LoadResource(prefabName, "prefabs/hall.ab", "Assets/NiuMa/Resources/", ".prefab");
+	    if (prefab ~= nil) then
+		    local obj = CS.UnityEngine.GameObject.Instantiate(prefab, self.gameObject.transform);
+		    if (obj ~= nil) then
+			    CS.NiuMa.LuaUGUI.SetText(obj, self._texts[1]);
+                notice = {};
+                notice._object = obj;
+                notice._elapsed = 0.0;
+                notice._posX = self._right;
+                table.insert(self._notices, notice);
+		    end
+	    end
+        table.remove(self._texts, 1);
+    end
+end
+
+function _module:AddNoticeText(text)
+    table.insert(self._texts, text);
+end
+
+return _module;

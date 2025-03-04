@@ -1,0 +1,198 @@
+-- 描述：百人牛牛结算界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.19
+
+local base = require 'BehaviourBase';
+local CommonUtils = require 'Common.CommonUtils';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Frame/HeadTexture");
+    local child1 = nil;
+    local child2 = nil;
+    if (child ~= nil) then
+        self._headTexture = child.gameObject;
+    end
+    child = obj.transform:Find("Win");
+    if (child ~= nil) then
+        self._win = child.gameObject;
+        child1 = child:Find("TextScore");
+        if (child1 ~= nil) then
+            self._winScore = child1.gameObject;
+        end
+        child1 = child:Find("TitleWin");
+        if (child1 ~= nil) then
+            self._winTitle = child1.gameObject;
+        end
+        child1 = child:Find("TitleVain");
+        if (child1 ~= nil) then
+            self._vainTitle = child1.gameObject;
+        end
+    end
+    child = obj.transform:Find("Lose");
+    if (child ~= nil) then
+        self._lose = child.gameObject;
+        child1 = child:Find("TextScore");
+        if (child1 ~= nil) then
+            self._loseScore = child1.gameObject;
+        end
+    end
+    self._players = {};
+    self._playerHeads = {};
+    self._playerNames = {};
+    self._playerScores = {};
+    child = obj.transform:Find("Frame/Players");
+    if (child ~= nil) then
+        for i = 1, 4 do
+            child1 = child:Find("Player" .. i);
+            if (child1 ~= nil) then
+                self._players[i] = child1.gameObject;
+                child2 = child1:Find("HeadTexture");
+                if (child2 ~= nil) then
+                    self._playerHeads[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextName");
+                if (child2 ~= nil) then
+                    self._playerNames[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextScore");
+                if (child2 ~= nil) then
+                    self._playerScores[i] = child2.gameObject;
+                end
+            end
+        end
+    end
+    child = obj.transform:Find("Frame/BtnNext");
+    if (child ~= nil) then
+        CS.NiuMa.LuaUGUI.AddBtnClick(child.gameObject, self.OnNextClick);
+    end
+end
+
+function _module:Start()
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module.OnNextClick()
+    local self = _module;
+    self:Show(false);
+end
+
+function _module:SetMyselfHead(tex)
+    if (self._headTexture ~= nil) then
+        CS.NiuMa.LuaUGUI.SetTexture(self._headTexture, tex);
+    end
+end
+
+function _module:SetPlayerName(idx, name)
+    if (self._playerNames[idx] ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._playerNames[idx], name);
+    end
+end
+
+function _module:SetPlayerScore(idx, score)
+    if (self._playerScores[idx] ~= nil) then
+        if (score < 0) then
+            CS.NiuMa.LuaUGUI.SetText(self._playerScores[idx], tostring(score));
+        else
+            CS.NiuMa.LuaUGUI.SetText(self._playerScores[idx], "+" .. tostring(score));
+        end
+    end
+end
+
+function _module:SetPlayerHead(idx, tex)
+    if (self._playerHeads[idx] ~= nil) then
+        CS.NiuMa.LuaUGUI.SetTexture(self._playerHeads[idx], tex);
+    end
+end
+
+function _module:SetPlayerHeadImgUrl(idx, url)
+	if (url == nil or #url == 0) then
+		return;
+	end
+	local tex = CS.NiuMa.GameManager.Instance:GetTextureByUrl(url);
+	if (tex ~= nil) then
+		self:SetPlayerHead(idx, tex);
+	else
+        local func = self:OnLoadHeadTexture(idx, url);
+		CS.NiuMa.HttpRequester.Instance:GetTexture(url, func);
+	end
+end
+
+function _module:OnLoadHeadTexture(idx, url)
+    local inst = self;
+	return function(tex)
+		local self = inst;
+		self:SetPlayerHead(idx, tex);
+        CS.NiuMa.GameManager.Instance:AddTextureUrl(url, tex);
+	end
+end
+
+function _module:OnSettlement(msg)
+    if (msg == nil) then
+        return;
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    if (msg.score < 0) then
+        if (self._win ~= nil) then
+            self._win:SetActive(false);
+        end
+        if (self._lose ~= nil) then
+            self._lose:SetActive(true);
+        end
+        if (self._loseScore ~= nil) then
+            ui.SetText(self._loseScore, tostring(msg.score));
+        end
+    else
+        if (self._win ~= nil) then
+            self._win:SetActive(true);
+        end
+        if (self._lose ~= nil) then
+            self._lose:SetActive(false);
+        end
+        if (msg.score > 0) then
+            if (self._winTitle ~= nil) then
+                self._winTitle:SetActive(true);
+            end
+            if (self._vainTitle ~= nil) then
+                self._vainTitle:SetActive(false);
+            end
+        else
+            if (self._winTitle ~= nil) then
+                self._winTitle:SetActive(false);
+            end
+            if (self._vainTitle ~= nil) then
+                self._vainTitle:SetActive(true);
+            end
+        end
+        if (self._winScore ~= nil) then
+            ui.SetText(self._winScore, "+" .. tostring(msg.score));
+        end
+    end
+    self:SetPlayerScore(1, msg.bankerScore);
+    local test = false;
+    for i = 2, 4 do
+        local playerId = msg.winnerIds[i - 1];
+        if (CommonUtils.IsStringEmpty(playerId)) then
+            test = false;
+        else
+            test = true;
+        end
+        if (self._players[i] ~= nil) then
+            self._players[i]:SetActive(test);
+        end
+        if (test) then
+            self:SetPlayerName(i, msg.winnerNames[i - 1]);
+            self:SetPlayerScore(i, msg.winnerScores[i - 1]);
+            self:SetPlayerHeadImgUrl(i, msg.winnerHeadImgUrls[i - 1]);
+        end
+    end
+end
+
+return _module;

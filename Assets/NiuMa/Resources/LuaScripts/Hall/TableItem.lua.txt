@@ -1,0 +1,90 @@
+--local LuaUGUI = Bird.LuaUGUI;
+--local String = System.String;
+local base = require 'BehaviourBase';
+local com_def = require "Common.Defines";
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("TextTableID");
+    if (child ~= nil) then
+        self._textTableID = child.gameObject;
+    end
+    child = obj.transform:Find("TextTableType");
+    if (child ~= nil) then
+        self._textTableType = child.gameObject;
+    end
+    child = obj.transform:Find("TextDepositBegin");
+    if (child ~= nil) then
+        self._textDepositBegin = child.gameObject;
+    end
+    child = obj.transform:Find("TextDepositEnd");
+    if (child ~= nil) then
+        self._textDepositEnd = child.gameObject;
+    end
+    child = obj.transform:Find("TextProfit");
+    if (child ~= nil) then
+        self._textProfit = child.gameObject;
+    end
+    child = obj.transform:Find("TextStatus");
+    if (child ~= nil) then
+        self._textStatus = child.gameObject;
+    end
+    child = obj.transform:Find("TextTime");
+    if (child ~= nil) then
+        self._textTime = child.gameObject;
+    end
+end
+
+function _module:Start()
+end
+
+function _module:SetTableItem(item)
+    if (item == nil) then
+		return;
+	end
+    if (self._textTableID ~= nil) then
+        LuaUGUI.SetText(self._textTableID, tostring(item.TableID));
+    end
+    if (self._textTableID ~= nil) then
+        local gameName = tostring(item.TableType);
+        if (item.TableType == com_def.TableType.NiuNiu100) then
+            gameName = "百人牛牛";
+        end
+        LuaUGUI.SetText(self._textTableType, gameName);
+    end
+    if (self._textDepositBegin ~= nil) then
+        LuaUGUI.SetText(self._textDepositBegin, String.Format("{0:0.##}", item.DepositBegin));
+    end
+	local text = "";
+    if (self._textDepositEnd ~= nil) then
+        if (item.Status == 0) then
+            text = String.Format("{0:0.##}", item.DepositEnd);
+		else
+			text = "-";
+        end
+        LuaUGUI.SetText(self._textDepositEnd, text);
+    end
+	if (self._textProfit ~= nil) then
+		if (item.Status == 0) then
+			local delta = item.DepositEnd - item.DepositBegin;
+			text = String.Format("{0:0.##}", delta);
+		else
+			text = "-";
+		end
+		LuaUGUI.SetText(self._textProfit, text);
+	end
+    if (self._textStatus ~= nil) then
+        if (item.Status == 0) then
+            LuaUGUI.SetText(self._textStatus, "已解散");
+        else
+            LuaUGUI.SetText(self._textStatus, "进行中");
+        end
+    end
+    if (self._textTime ~= nil) then
+        LuaUGUI.SetText(self._textTime, item.Time);
+    end
+end
+
+return _module;

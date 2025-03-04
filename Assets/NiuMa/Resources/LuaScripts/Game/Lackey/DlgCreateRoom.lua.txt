@@ -1,0 +1,280 @@
+-- 描述：逮狗腿创建游戏对话框界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.05
+
+local base = require 'BehaviourBase';
+local com_def = require 'Common.Defines';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	self._mode = 0;
+	self._diZhu1 = 0;
+	self._diZhu2 = 0;
+	self._dianPao = true;
+	local child = obj.transform:Find("Frame");
+	local child1 = nil;
+	local child2 = nil;
+	local ui = CS.NiuMa.LuaUGUI;
+	if (child ~= nil) then
+		child1 = child:Find("BtnClose");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnCloseClick);
+		end
+		child1 = child:Find("BtnCreate");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnCreateClick);
+		end
+		child1 = child:Find("ToggleMode");
+		if (child1 ~= nil) then
+			child2 = child1:Find("ToggleKouZuan");
+			if (child2 ~= nil) then
+				ui.AddToggleClick(child2.gameObject, self.OnKouZuanChanged);
+			end
+			child2 = child1:Find("ToggleChouShui");
+			if (child2 ~= nil) then
+				ui.AddToggleClick(child2.gameObject, self.OnChouShuiChanged);
+			end
+		end
+		child1 = child:Find("DiZhuGroup1");
+		if (child1 ~= nil) then
+			self._diZhuGroup1 = child1.gameObject;
+			local funcName = nil;
+			for i = 1, 9 do
+				child2 = child1:Find("Toggle"..i);
+				if (child2 ~= nil) then
+					funcName = "OnDiZhu1"..i.."Changed";
+					ui.AddToggleClick(child2.gameObject, self[funcName]);
+				end
+			end
+		end
+		child1 = child:Find("DiZhuGroup2");
+		if (child1 ~= nil) then
+			self._diZhuGroup2 = child1.gameObject;
+			local funcName = nil;
+			for i = 1, 9 do
+				child2 = child1:Find("Toggle"..i);
+				if (child2 ~= nil) then
+					funcName = "OnDiZhu2"..i.."Changed";
+					ui.AddToggleClick(child2.gameObject, self[funcName]);
+				end
+			end
+		end
+	end
+end
+
+function _module:Start()
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetHall(hall)
+	self._hall = hall;
+end
+
+function _module.OnCloseClick()
+	local self = _module;
+	if (self.gameObject ~= nil) then
+		self.gameObject:SetActive(false);
+	end
+end
+
+--点击创建房间按钮
+function _module.OnCreateClick()
+	local self = _module;
+	local msg = {};
+	msg.gameType = com_def.GameType.Lackey;
+	local t = {};
+	t.mode = self._mode;
+	if (self._mode == 0) then
+		t.diZhu = self._diZhu1;
+	else
+		t.diZhu = self._diZhu2;
+	end
+	local util = CS.NiuMa.Utility;
+	local text = rapidjson.encode(t);
+	msg.base64 = util.EncodeBase64(text);
+	local body = rapidjson.encode(msg);
+	CS.NiuMa.GameManager.Instance:AuthPost("/player/game/create", body, self._hall.OnCreateResponse);
+    self:Show(false);
+end
+
+function _module.OnKouZuanChanged(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._mode = 0;
+	self:OnModeChanged();
+end
+
+function _module.OnChouShuiChanged(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._mode = 1;
+	self:OnModeChanged();
+end
+
+function _module.OnModeChanged()
+	local self = _module;
+	local ret = (self._mode == 1);
+	if (self._diZhuGroup1 ~= nil) then
+		self._diZhuGroup1:SetActive(not ret);
+	end
+	if (self._diZhuGroup2 ~= nil) then
+		self._diZhuGroup2:SetActive(ret);
+	end
+end
+
+function _module.OnDiZhu11Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu1 = 0;
+end
+
+function _module.OnDiZhu12Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu1 = 1;
+end
+
+function _module.OnDiZhu13Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu1 = 2;
+end
+
+function _module.OnDiZhu14Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu1 = 3;
+end
+
+function _module.OnDiZhu15Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu1 = 4;
+end
+
+function _module.OnDiZhu16Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu1 = 5;
+end
+
+function _module.OnDiZhu17Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu1 = 6;
+end
+
+function _module.OnDiZhu18Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu1 = 7;
+end
+
+function _module.OnDiZhu19Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu1 = 8;
+end
+
+function _module.OnDiZhu21Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu2 = 0;
+end
+
+function _module.OnDiZhu22Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu2 = 1;
+end
+
+function _module.OnDiZhu23Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu2 = 2;
+end
+
+function _module.OnDiZhu24Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu2 = 3;
+end
+
+function _module.OnDiZhu25Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu2 = 4;
+end
+
+function _module.OnDiZhu26Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu2 = 5;
+end
+
+function _module.OnDiZhu27Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu2 = 6;
+end
+
+function _module.OnDiZhu28Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu2 = 7;
+end
+
+function _module.OnDiZhu29Changed(val)
+	local self = _module;
+	if (not val) then
+		return;
+	end
+	self._diZhu2 = 8;
+end
+
+return _module;

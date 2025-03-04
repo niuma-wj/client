@@ -1,0 +1,116 @@
+local base = require 'BehaviourBase';
+local mah_def = require 'Game.Mahjong.MahjongDefines';
+local ao_chi = require 'Game.Mahjong.ActionOptionChi';
+local ao_gang = require 'Game.Mahjong.ActionOptionGang';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local rm = CS.NiuMa.ResourceManager.Instance;
+    self._Objects = {};
+    self._chiOptionPrefab = rm:LoadResource("Prefabs/Game/Mahjong/ActionOptionChi", "prefabs/mahjong_main.ab", "Assets/NiuMa/Resources/", ".prefab");
+    self._gangOptionPrefab = rm:LoadResource("Prefabs/Game/Mahjong/ActionOptionGang", "prefabs/mahjong_main.ab", "Assets/NiuMa/Resources/", ".prefab");
+end
+
+function _module:Start()
+end
+
+function _module:SetRoom(room)
+    self._room = room;
+end
+
+function _module:SetMahjongSprites(obj)
+    self._mahjongSprites = obj;
+end
+
+function _module:Show(show)
+    if (self.gameObject ~= nil) then
+        self.gameObject:SetActive(show);
+    end
+end
+
+function _module:ShowActionOptions(actionOptions)
+    for i, obj in ipairs(self._Objects) do
+        CS.UnityEngine.GameObject.Destroy(obj);
+    end
+    self._Objects = {};
+    if (self.gameObject == nil or actionOptions == nil) then
+        return;
+    end
+    local nums = #actionOptions;
+    if (nums < 1) then
+        return;
+    end
+    local chiOrGang = false;
+    if (actionOptions[1].Type == mah_def.MahjongAction.Chi) then
+        chiOrGang = true;
+    end
+    local sizeX = 46;
+    if (chiOrGang) then
+        sizeX = 92;
+    end
+    local width = nums * sizeX + (nums - 1) * 10 + 20;
+    local x = 10 - ((width - sizeX) / 2);
+    local trans = self.gameObject.transform;
+    if (trans ~= null) then
+        local tmpSize = CS.UnityEngine.Vector2(trans.sizeDelta.x, trans.sizeDelta.y);
+        tmpSize.x = width;
+        trans.sizeDelta = tmpSize;
+    end
+    local prefab = nil;
+    if (chiOrGang) then
+        prefab = self._chiOptionPrefab;
+    else
+        prefab = self._gangOptionPrefab;
+    end
+    if (prefab == nil) then
+        return;
+    end
+    local inst = nil;
+    local trans = nil;
+    local acOp = nil;
+    local cnt = 1;
+    for i, v in ipairs(actionOptions) do
+        inst = CS.UnityEngine.GameObject.Instantiate(prefab, self.gameObject.transform);
+        if (inst ~= nil) then
+            trans = inst.transform;
+            if (trans ~= nil) then
+                trans.anchoredPosition = Vector2(x, 0.0);
+            end
+            if (chiOrGang) then
+                inst.name = "ChiOption"..v.ID;
+                acOp = ao_chi.NewInstance();
+                acOp.gameObject = inst;
+                acOp:Awake();
+            else
+                inst.name = "GangOption"..v.ID;
+                acOp = ao_gang.NewInstance();
+                acOp.gameObject = inst;
+                acOp:Awake(inst);
+            end
+            if (acOp ~= nil) then
+                acOp:SetActionOption(self);
+                acOp:SetActionOptionID(v.ID);
+                acOp:SetMahjongSprites(self._mahjongSprites);
+                if (chiOrGang) then
+                    acOp:SetTile1(v.Tile1);
+                    acOp:SetTile2(v.Tile2);
+                else
+                    acOp:SetTile(v.Tile1);
+                end
+            end
+            self._Objects[cnt] = inst;
+			cnt = cnt + 1;
+        end
+        x = x + sizeX + 10;
+    end
+end
+
+function _module:OnActionClick(id)
+    if (self._room ~= nil) then
+        self._room:TakeActionOption(id, 0);
+    end
+end
+
+return _module;

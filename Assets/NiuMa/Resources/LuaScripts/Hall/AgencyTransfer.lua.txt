@@ -1,0 +1,320 @@
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("InputID");
+    local child1 = nil;
+    local child2 = nil;
+    if (child ~= nil) then
+        self._inputID = child.gameObject;
+    end
+    child = obj.transform:Find("InputAmount");
+    if (child ~= nil) then
+        self._inputAmout = child.gameObject;
+    end
+	child = obj.transform:Find("InputPassword");
+    if (child ~= nil) then
+        self._inputPassword = child.gameObject;
+    end
+    child = obj.transform:Find("TextBalance/Text");
+    if (child ~= nil) then
+        self._textBalance = child.gameObject;
+    end
+    child = obj.transform:Find("TextTotal/Text");
+    if (child ~= nil) then
+        self._textTotal = child.gameObject;
+    end
+    child = obj.transform:Find("BtnOk");
+    if (child ~= nil) then
+        CS.NiuMa.LuaUGUI.AddBtnClick(child.gameObject, _module.OnTransferClick);
+    end
+    self._records = {};
+    self._rcdPlayerIds = {};
+    self._rcdPlayerNames = {};
+    self._rcdAmounts = {};
+    self._rcdTimes = {};
+    child = obj.transform:Find("Records/ScrollView/Viewport/Content/List");
+    if (child ~= nil) then
+        for i = 1, 10 do
+            child1 = child:Find(string.format("Record%02d", i));
+            if (child1 ~= nil) then
+                self._records[i] = child1.gameObject;
+                child2 = child1:Find("TextPlayerId");
+                if (child2 ~= nil) then
+                    self._rcdPlayerIds[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextPlayerName");
+                if (child2 ~= nil) then
+                    self._rcdPlayerNames[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextAmount");
+                if (child2 ~= nil) then
+                    self._rcdAmounts[i] = child2.gameObject;
+                end
+                child2 = child1:Find("TextTime");
+                if (child2 ~= nil) then
+                    self._rcdTimes[i] = child2.gameObject;
+                end
+            end
+        end
+    end
+    child = obj.transform:Find("Records/Page");
+    if (child ~= nil) then
+        child1 = child:Find("BtnFront");
+        if (child1 ~= nil) then
+            CS.NiuMa.LuaUGUI.AddBtnClick(child1.gameObject, _module.OnFrontClick);
+        end
+        child1 = child:Find("BtnNext");
+        if (child1 ~= nil) then
+            CS.NiuMa.LuaUGUI.AddBtnClick(child1.gameObject, _module.OnNextClick);
+        end
+        child1 = child:Find("TextPage");
+        if (child1 ~= nil) then
+            self._textPage = child1.gameObject;
+        end
+    end
+    -- 当前页
+    self._page = 1;
+    -- 总页数
+    self._totalPage = 0;
+    -- 是否正在执行转账操作
+    self._transfering = false;
+    -- 当前是否正在请求转账记录
+    self._requesting = false;
+    -- 是否首次显示窗口
+    self._firstShow = true;
+end
+
+function _module:Update()
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+-- 获取累计转账数量
+function _module.OnGetAccAmount(code, text)
+    local self = _module;
+    if (code == 200) then
+        local t = rapidjson.decode(text);
+         if (self._textTotal ~= nil) then
+            CS.NiuMa.LuaUGUI.SetText(self._textTotal, tostring(t.accAmount));
+        end
+    end
+end
+
+function _module.OnTransferClick()
+    local self = _module;
+    if (self._transfering) then
+        return;
+    end
+    local playerId = nil;
+    local amount = 0;
+    local text = "";
+    local ui = CS.NiuMa.LuaUGUI;
+    local gm = CS.NiuMa.GameManager.Instance;
+    if (self._inputID ~= nil) then
+        playerId = ui.GetInputText(self._inputID);
+    end
+    if (self._inputAmout ~= nil) then
+        text = ui.GetInputText(self._inputAmout);
+        if (text ~= nil and #text > 0) then
+            amount = tonumber(text);
+        end
+    end
+    if ((playerId == nil) or (#playerId == 0) or (amount < 1)) then
+        gm:ShowPromptTip("请输入正确的玩家ID和转账金额", 2.0);
+        return;
+    end
+    if (playerId == gm.PlayerId) then
+        gm:ShowPromptTip("不能给自己转账", 2.0);
+        return;
+    end
+    self._playerId = playerId;
+    self._amount = amount;
+    text = "确定要给玩家(Id: " .. playerId .. ")转账" .. tostring(amount) .. "金币吗？金币将从您的保险箱扣除并存入对方保险箱。";
+	gm:ShowPromptDialog(text, self.DoTransfer);
+end
+
+function _module.DoTransfer()
+    local self = _module;
+	local pwd = "";
+    local ui = CS.NiuMa.LuaUGUI;
+	if (self._inputPassword ~= nil) then
+		pwd = ui.GetInputText(self._inputPassword);
+	end
+	if (pwd ~= nil and #pwd > 0) then
+        pwd = CS.NiuMa.AesUtil.Encrypt(pwd);
+    end
+    local t = {};
+    t.playerId = self._playerId;
+    t.amount = self._amount;
+    if (pwd ~= nil and #pwd > 0) then
+	    t.password = pwd;
+    end
+    local body = rapidjson.encode(t);
+    CS.NiuMa.GameManager.Instance:AuthPost("/player/capital/transfer", body, self.OnTransferRespone);
+    self._transfering = true;
+end
+
+function _module.OnTransferRespone(code, text)
+    local self = _module;
+    self._transfering = false;
+    local ui = CS.NiuMa.LuaUGUI;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code == 200) then
+        gm.Deposit = t.deposit;
+        if (self._textBalance ~= nil) then
+            ui.SetText(self._textBalance, tostring(t.deposit));
+        end
+        if (self._textTotal ~= nil) then
+            ui.SetText(self._textTotal, tostring(t.accAmount));
+        end
+        if (self._page == 1) then
+            self:RequestPage(1);
+        end
+        gm:ShowPromptTip("转账成功", 2.0);
+    else
+        local msg = t.msg;
+        if (msg == nil or #msg == 0) then
+            msg = text;
+        end
+        msg = "转账失败：" .. msg;
+        gm:ShowPromptTip(msg, 3.0);
+    end
+end
+
+function _module.OnFrontClick()
+    local self = _module;
+    if (self._page == 1) then
+        return;
+    end
+    self:RequestPage(self._page - 1);
+end
+
+function _module.OnNextClick()
+    local self = _module;
+    if (self._page >= self._totalPage) then
+        return;
+    end
+    self:RequestPage(self._page + 1);
+end
+
+-- 请求页面
+function _module:RequestPage(page)
+    if (self._requesting) then
+        return;
+    end
+    local t = {};
+    t.pageNum = page;
+    --固定每页10条数据
+    t.pageSize = 10;
+    local body = rapidjson.encode(t);
+    CS.NiuMa.GameManager.Instance:AuthPost("/player/capital/transfer/record", body, self.OnRequestRespone);
+    self._requesting = true;
+end
+
+-- 重新打开代理窗口后更新第一页
+function _module:UpdateFirstPage()
+    if (self._firstShow) then
+        self._firstShow = false;
+        local gm = CS.NiuMa.GameManager.Instance;
+        if (self._textBalance ~= nil) then
+            CS.NiuMa.LuaUGUI.SetText(self._textBalance, tostring(gm.Deposit));
+        end
+        gm:AuthGet("/player/capital/transfer/acc", self.OnGetAccAmount);
+        self:RequestPage(1);
+    end
+end
+
+-- 成功领取奖励后执行
+function _module:AfterCollect()
+    if (self._textBalance ~= nil) then
+        local gm = CS.NiuMa.GameManager.Instance;
+        CS.NiuMa.LuaUGUI.SetText(self._textBalance, tostring(gm.Deposit));
+    end
+end
+
+function _module:Clear()
+    self._playerId = 0;
+    self._amount = 0;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (self._inputID ~= nil) then
+        ui.SetInputText(self._inputID, "");
+    end
+    if (self._inputAmout ~= nil) then
+        ui.SetInputText(self._inputAmout, "");
+    end
+	if (self._inputPassword ~= nil) then
+        ui.SetInputText(self._inputPassword, "");
+    end
+    for i = 1, 10 do
+        if (self._records[i] ~= nil) then
+            self._records[i]:SetActive(false);
+        end
+    end
+    self._page = 1;
+    self._totalPage = 0;
+    self._firstShow = true;
+    self:UpdatePageText();
+end
+
+function _module.OnRequestRespone(code, text)
+    local self = _module;
+    local ui = CS.NiuMa.LuaUGUI;
+    local gm = CS.NiuMa.GameManager.Instance;
+    self._requesting = false;
+    if (code == 200) then
+        local t = rapidjson.decode(text);
+        self._page = t.pageNum;
+        self._totalPage = math.ceil(t.total / 10);
+        self:UpdatePageText();
+        local nums = 0;
+        if (t.records ~= nil and t.records ~= rapidjson.null) then
+            nums = #(t.records);
+        end
+        for i = 1, nums do
+            local record = t.records[i];
+            if (self._records[i] ~= nil) then
+                self._records[i]:SetActive(true);
+            end
+            if (self._rcdPlayerIds[i] ~= nil) then
+                ui.SetText(self._rcdPlayerIds[i], record.dstPlayerId);
+            end
+            if (self._rcdPlayerNames[i] ~= nil) then
+                ui.SetText(self._rcdPlayerNames[i], record.dstNickname);
+            end
+            if (self._rcdAmounts[i] ~= nil) then
+                ui.SetText(self._rcdAmounts[i], tostring(record.amount));
+            end
+            if (self._rcdTimes[i] ~= nil) then
+                ui.SetText(self._rcdTimes[i], record.time);
+            end
+        end
+        for i = nums + 1, 10 do
+            if (self._records[i] ~= nil) then
+                self._records[i]:SetActive(false);
+            end
+        end
+    end
+end
+
+function _module:UpdatePageText()
+    local text = "";
+    if (self._totalPage > 0) then
+        text = tostring(self._page) .. "/" .. tostring(self._totalPage);
+    end
+    if (self._textPage ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textPage, text);
+    end
+end
+
+return _module;

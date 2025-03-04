@@ -1,0 +1,211 @@
+-- 描述：狗腿战绩记录界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.05
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("TextID");
+    if (child ~= nil) then
+        self._textID = child.gameObject;
+    end
+    child = obj.transform:Find("TextDiZhu");
+    if (child ~= nil) then
+        self._textDiZhu = child.gameObject;
+    end
+    child = obj.transform:Find("TextBeiLv");
+    if (child ~= nil) then
+        self._textBeiLv = child.gameObject;
+    end
+    child = obj.transform:Find("TextTime");
+    if (child ~= nil) then
+        self._textTime = child.gameObject;
+    end
+    self._headTextures = {};
+    self._textNames = {};
+    self._textScores = {};
+    self._textXiQians = {};
+    self._textWinGolds = {};
+    self._flag1v4s = {};
+    self._flagDiZhus = {};
+    self._flagLackeys = {};
+    self._flagShowCards = {};
+    for i = 1, 5 do
+        child = obj.transform:Find("Player"..i);
+        if (child ~= nil) then
+            local child1 = child:Find("HeadTexture");
+            if (child1 ~= nil) then
+                self._headTextures[i] = child1.gameObject;
+                local child2 = child1:Find("1v4");
+                if (child2 ~= nil) then
+                    self._flag1v4s[i] = child2.gameObject;
+                end
+                child2 = child1:Find("DiZhu");
+                if (child2 ~= nil) then
+                    self._flagDiZhus[i] = child2.gameObject;
+                end
+                child2 = child1:Find("Lackey");
+                if (child2 ~= nil) then
+                    self._flagLackeys[i] = child2.gameObject;
+                end
+                child2 = child1:Find("ShowCard");
+                if (child2 ~= nil) then
+                    self._flagShowCards[i] = child2.gameObject;
+                end
+            end
+            child1 = child:Find("TextName");
+            if (child1 ~= nil) then
+                self._textNames[i] = child1.gameObject;
+            end
+            child1 = child:Find("TextXiQian");
+            if (child1 ~= nil) then
+                self._textXiQians[i] = child1.gameObject;
+            end
+            child1 = child:Find("TextScore");
+            if (child1 ~= nil) then
+                self._textScores[i] = child1.gameObject;
+            end
+            child1 = child:Find("TextTotal");
+            if (child1 ~= nil) then
+                self._textWinGolds[i] = child1.gameObject;
+            end
+        end
+    end
+end
+
+function _module:Start()
+    self:Show(false);
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetZhanJi(zj)
+    self._zhanJi = zj;
+end
+
+function _module:SetRecord(rec)
+    local ui = CS.NiuMa.LuaUGUI;
+    if (self._textID ~= nil) then
+        local text = "";
+        if (rec.level == 1) then
+            text = tostring(rec.number);
+        elseif (rec.level == 2) then
+            text = "新手房";
+        elseif (rec.level == 3) then
+            text = "初级房";
+        elseif (rec.level == 4) then
+            text = "高级房";
+        elseif (rec.level == 5) then
+            text = "顶级房";
+        end
+        ui.SetText(self._textID, text);
+    end
+    if (self._textDiZhu ~= nil) then
+        ui.SetText(self._textDiZhu, "底注:" .. tostring(rec.diZhu));
+    end
+    if (self._textBeiLv ~= nil) then
+        ui.SetText(self._textBeiLv, "倍率:" .. tostring(rec.beiLv));
+    end
+    if (self._textTime ~= nil) then
+        ui.SetText(self._textTime, rec.time);
+    end
+    self._landlord = rec.landlord;
+    self._lackey = rec.lackey;
+    for i = 1, 5 do
+        self:SetPlayer(rec.players[i], i);
+    end
+end
+
+function _module:SetPlayer(player, idx)
+    if (player == nil or self._zhanJi == nil) then
+        return;
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    if (self._headTextures[idx] ~= nil) then
+		local tex = self._zhanJi:GetHeadTextureByUrl(player.headImgUrl);
+		if (tex ~= nil) then
+			ui.SetTexture(self._headTextures[idx], tex);
+		else
+            local func = self:OnLoadHeadTexture(idx, player.headImgUrl);
+            CS.NiuMa.HttpRequester.Instance:GetTexture(player.headImgUrl, func);
+		end
+	end
+    if (self._textNames[idx] ~= nil) then
+        ui.SetText(self._textNames[idx], player.nickname);
+    end
+    local Color = CS.UnityEngine.Color;
+    if (self._textScores[idx] ~= nil) then
+        ui.SetText(self._textScores[idx], string.format("%0.1f", player.score));
+        if (player.score < 0.0) then
+            ui.SetTextColor(self._textScores[idx], Color(1.0, 0.0, 0.0, 1.0));
+        else
+            ui.SetTextColor(self._textScores[idx], Color(0.0, 0.588, 0.0, 1.0));
+        end
+    end
+    if (self._textXiQians[idx] ~= nil) then
+        ui.SetText(self._textXiQians[idx], tostring(player.xiQian));
+        if (player.xiQian < 0.0) then
+            ui.SetTextColor(self._textXiQians[idx], Color(1.0, 0.0, 0.0, 1.0));
+        else
+            ui.SetTextColor(self._textXiQians[idx], Color(0.0, 0.588, 0.0, 1.0));
+        end
+    end
+    if (self._textWinGolds[idx] ~= nil) then
+         ui.SetText(self._textWinGolds[idx], tostring(player.winGold));
+         if (player.winGold < 0.0) then
+            ui.SetTextColor(self._textWinGolds[idx], Color(1.0, 0.0, 0.0, 1.0));
+        else
+            ui.SetTextColor(self._textWinGolds[idx], Color(0.0, 0.588, 0.0, 1.0));
+        end
+    end
+    local test1 = false;
+    local test2 = false;
+    local test3 = false;
+    if (self._landlord == self._lackey) then
+        if (self._landlord == (idx - 1)) then
+            test1 = true;
+        end
+    elseif (self._landlord == (idx - 1)) then
+        test2 = true;
+    elseif (self._lackey == (idx - 1)) then
+        test3 = true;
+    end
+    if (self._flag1v4s[idx] ~= nil) then
+        self._flag1v4s[idx]:SetActive(test1);
+    end
+    if (self._flagDiZhus[idx] ~= nil) then
+        self._flagDiZhus[idx]:SetActive(test2);
+    end
+    if (self._flagLackeys[idx] ~= nil) then
+        self._flagLackeys[idx]:SetActive(test3);
+    end
+    if (self._flagShowCards[idx] ~= nil) then
+        self._flagShowCards[idx]:SetActive(player.showCard == 1);
+    end
+end
+
+function _module:OnLoadHeadTexture(idx, url)
+    local inst = self;
+    return function(tex)
+        local self = inst;
+        if (self._headTextures[idx] ~= nil) then
+			CS.NiuMa.LuaUGUI.SetTexture(self._headTextures[idx], tex);
+		end
+        if (self._zhanJi ~= nil) then
+		    self._zhanJi:AddHeadTexture(url, tex);
+        end
+    end
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

@@ -1,0 +1,30 @@
+local mah_def = require 'Game.Mahjong.MahjongDefines';
+
+local _module = {};
+
+function _module.TileFromID(id)
+    local tmp = id;
+    local pat = 0;
+    local num = 0;
+	if (tmp < 108) then
+		pat = 1 + math.floor(tmp / 36);
+		num = 1 + math.floor((tmp % 36) / 4);
+	elseif (tmp < 136) then
+		tmp = tmp - 108;
+		pat = mah_def.MahjongPattern.Dong + math.floor(tmp / 4);
+	elseif (tmp < 144) then
+		tmp = tmp - 136;
+		pat = mah_def.MahjongPattern.Chun + tmp;
+	else
+		return nil;
+    end
+	local t = {};
+    local mt = {};
+    t.pattern = pat;
+	t.number = num;
+	mt.tile = t;
+    mt.id = id;
+	return mt;
+end
+
+return _module;

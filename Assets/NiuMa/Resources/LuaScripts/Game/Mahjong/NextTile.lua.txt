@@ -1,0 +1,34 @@
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("InputField");
+    if (child ~= nil) then
+        self._input = child.gameObject;
+    end
+    child = obj.transform:Find("BtnOk");
+	if (child ~= nil) then
+		CS.NiuMa.LuaUGUI.AddBtnClick(child.gameObject, self.OnOkClick);
+	end
+end
+
+function _module.OnOkClick()
+    local self = _module;
+    if (self._input == nil) then
+        return;
+    end
+    local text = CS.NiuMa.LuaUGUI.GetInputText(self._input);
+    if (text == nil or #text == 0) then
+        return;
+    end
+    --[[
+    local msg = bd_pb.NetMsgString();
+	msg.Val = text;
+	local pb_data = msg:SerializeToString();
+    LuaGameUtilities.SendTableMessage("PT_NEXT_TILE", "NetMsgString", pb_data);
+    --]]
+end
+
+return _module;

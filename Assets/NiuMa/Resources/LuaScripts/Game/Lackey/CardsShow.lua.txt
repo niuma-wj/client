@@ -1,0 +1,264 @@
+-- 描述：逮狗腿明牌脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.08
+
+local base = require 'BehaviourBase';
+local GameObject = CS.UnityEngine.GameObject;
+local CardGenerator = require 'Game.Lackey.CardGenerator';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Cards");
+    if (child ~= nil) then
+        self._cardParent = child;
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    child = obj.transform:Find("Flag");
+    if (child ~= nil) then
+        self._flag = child.gameObject:GetComponent("ImageSelector");
+        local func = self:OnFlagClick();
+        ui.AddBtnClick(child.gameObject, func);
+    end
+    child = obj.transform:Find("BtnSort");
+    if (child ~= nil) then
+        local func = self:OnSortClick();
+        ui.AddBtnClick(child.gameObject, func);
+    end
+    self._cards = {};
+    self._cardObjs = {};
+    self._index2Ids = {};
+    self._id2Indices = {};
+    self._sortedIds = {};
+    self._sorted = true;
+    self._outted = true;
+end
+
+function _module:Start()
+    self._slipCallback = self:OnSlipComplete();
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetSeat(seat)
+    self._seat = seat;
+end
+
+function _module:OnFlagClick()
+    local inst = self;
+    return function()
+        local self = inst;
+        if (self._twSlip ~= nil) then
+            return;
+        end
+        self:SlipOut(not self._outted);
+    end
+end
+
+function _module:SlipOut(out)
+    if (out and self._outted) then
+        return;
+    end
+    if (not out and not self._outted) then
+        return;
+    end
+    if (self._twSlip ~= nil) then
+        self._twSlip:Kill();
+        self._twSlip = nil;
+    end
+    self._outted = out;
+    local trans = self.gameObject:GetComponent("RectTransform");
+    local y = trans.anchoredPosition.y;
+    local x = 0;
+    if (self._seat == 2 or self._seat == 3) then
+        if (self._outted) then
+            x = -6;
+        else
+            x = 246;
+        end
+    else
+        if (self._outted) then
+            x = 6;
+        else
+            x = -246;
+        end
+    end
+    local doTween = CS.NiuMa.LuaDOTween;
+    self._twSlip = doTween.DOAnchorPos(self.gameObject, CS.UnityEngine.Vector2(x, y), 0.2);
+    doTween.SetEase(self._twSlip, CS.DG.Tweening.Ease.OutCubic);
+    doTween.OnComplete(self._twSlip, self._slipCallback);
+end
+
+function _module:OnSlipComplete()
+    local inst = self;
+    return function()
+        local self = inst;
+        self._twSlip = nil;
+    end
+end
+
+function _module:OnSortClick()
+    local inst = self;
+    return function()
+        local self = inst;
+        self._sorted = not self._sorted;
+        self:ReplaceCards();
+    end
+end
+
+function _module:ClearCards()
+    local nums = #(self._cardObjs);
+    if (nums == 0) then
+        return;
+    end
+    for i = 1, nums do
+        if (self._cardObjs[i] ~= nil) then
+            CS.UnityEngine.GameObject.Destroy(self._cardObjs[i]);
+        end
+    end
+    self._cards = {};
+    self._cardObjs = {};
+    self._index2Ids = {};
+    self._id2Indices = {};
+    self._sortedIds = {};
+end
+
+function _module:OnShowCard(msg)
+    if (msg == nil) then
+        return;
+    end
+    self:ClearCards();
+    self._cards = msg.cards;
+    local nums = #(msg.cards);
+    local Vector3 = CS.UnityEngine.Vector3;
+    for i = 1, nums do
+        local card = msg.cards[nums - i + 1];
+        local obj = CardGenerator.CreateCard(card.point, card.suit, true, self._cardParent);
+        obj.transform.localScale = Vector3(0.65, 0.65, 1.0);
+        table.insert(self._cardObjs, obj);
+        table.insert(self._index2Ids, card.id);
+        self._id2Indices[card.id] = i;
+    end
+    self._sortedIds = CardGenerator.SortCardIds(self._cards);
+    self:ReplaceCards();
+end
+
+-- 重新摆放手牌
+function _module:ReplaceCards()
+    local nums = #(self._cardObjs);
+    local obj = nil;
+    local tmp = 0;
+    local scl = 1.0;
+    local dx = 30;
+    local dy = 48;
+    local left = -105.0;
+    local top = 72.0;
+    local line = 8;
+    local itr = 0;
+    local x = left;
+    local y = top;
+    if (nums > 36) then
+        scl = 0.8;
+        line = 10;
+    elseif (nums > 32) then
+        scl = 0.889;
+        line = 9;
+    end
+    dx = dx * scl;
+    local Vector2 = CS.UnityEngine.Vector2;
+    local Vector3 = CS.UnityEngine.Vector3;
+    for i = 1, nums do
+        if (self._sorted) then
+            tmp = self._sortedIds[i];
+            tmp = self._id2Indices[tmp];
+            obj = self._cardObjs[tmp];
+        else
+            obj = self._cardObjs[i];
+        end
+        if (obj ~= nil) then
+            obj.transform.anchoredPosition = Vector2(x, y);
+            obj.transform.localScale = Vector3(scl, scl, 1.0);
+        end
+        itr = itr + 1;
+        x = x + dx;
+        if (itr == line) then
+            itr = 0;
+            x = left;
+            y = y - dy;
+        end
+    end
+end
+
+function _module:OnLackeyCard(id)
+    local idx = self._id2Indices[id];
+    if (idx == nil) then
+        return;
+    end
+    local obj = self._cardObjs[idx];
+    if (obj ~= nil) then
+        CardGenerator.CreateLackeyMask(true, true, obj.transform);
+    end
+end
+
+function _module:SetRole(role)
+    if (role < 0 or role > 2) then
+        return;
+    end
+    if (self._flag ~= nil) then
+        self._flag:SetSprite(role);
+    end
+end
+
+function _module:OnPlayCard(cards)
+    local nums1 = #cards;
+    local nums2 = 0;
+    local ids = {};
+    local idx = 0;
+    local card1 = nil;
+    local card2 = nil;
+    for i = 1, nums1 do
+        card1 = cards[i];
+        ids[card1.id] = true;
+        nums2 = #(self._cards);
+        for j = 1, nums2 do
+            card2 = self._cards[j];
+            if (card1.id == card2.id) then
+                table.remove(self._cards, j);
+                break;
+            end
+        end
+        idx = self._id2Indices[card1.id];
+        if (idx ~= nil and self._cardObjs[idx] ~= nil) then
+            GameObject.Destroy(self._cardObjs[idx]);
+        end
+    end
+    local id = 0;
+    local objs = {};
+    local index2Ids = {};
+    local id2Indices = {};
+    local nums3 = #(self._index2Ids);
+    for i = 1, nums3 do
+        id = self._index2Ids[i];
+        if (not ids[id]) then
+            table.insert(objs, self._cardObjs[i]);
+            table.insert(index2Ids, id);
+            id2Indices[id] = #objs;
+        end
+    end
+    self._cardObjs = objs;
+    self._index2Ids = index2Ids;
+    self._id2Indices = id2Indices;
+    self._sortedIds = CardGenerator.SortCardIds(self._cards);
+    self:ReplaceCards();
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

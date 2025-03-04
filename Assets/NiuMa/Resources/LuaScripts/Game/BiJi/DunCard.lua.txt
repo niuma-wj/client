@@ -1,0 +1,102 @@
+-- 描述：比鸡牌墩逻辑脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.28
+
+local base = require 'BehaviourBase';
+local Vector3 = CS.UnityEngine.Vector3;
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Start()
+    self._callback1 = self:OnFlipCard1();
+    self._callback2 = self:OnFlipCard2();
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetRoom(r)
+    self._room = r;
+end
+
+function _module:SetBack(back)
+    self._back = back;
+end
+
+function _module:SetCardObject(obj)
+    self._cardObj = obj;
+end
+
+function _module:SetFinalCard(s)
+    self._finalCard = s;
+end
+
+function _module:GetTransform()
+    return self.gameObject.transform;
+end
+
+function _module:FlipCard()
+    if (self._cardObj == nil or self._back == nil) then
+        return;
+    end
+    local doTween = CS.NiuMa.LuaDOTween;
+    self._tweener = doTween.DORotate(self.gameObject, Vector3(0.0, 90.0, 0.0), 0.2);
+    doTween.OnComplete(self._tweener, self._callback1);
+	self._animating = true;
+end
+
+function _module:OnFlipCard1()
+    local inst = self;
+    return function()
+        local self = inst;
+        self._back:SetActive(true);
+        self._cardObj:SetActive(false);
+        local trans = self._back.transform;
+        trans.localRotation = CS.UnityEngine.Quaternion.AngleAxis(-90.0, Vector3(0.0, 1.0, 0.0));
+        local doTween = CS.NiuMa.LuaDOTween;
+        self._tweener = doTween.DORotate(self._back, Vector3(0.0, 0.0, 0.0), 0.2);
+        doTween.OnComplete(self._tweener, self._callback2);
+    end
+end
+
+function _module:OnFlipCard2()
+    local inst = self;
+    return function()
+        local self = inst;
+        self._back:SetActive(false);
+        self._cardObj:SetActive(true);
+        local trans = self.gameObject.transform;
+        trans.localRotation = CS.UnityEngine.Quaternion(0.0, 0.0, 0.0, 1.0);
+        self._cardObj.transform:SetParent(trans, false);
+        self._animating = false;
+	    self._tweener = nil;
+        if (self._finalCard and self._room ~= nil) then
+            self._room:OnSortDunComplete();
+		    self._finalCard = false;
+        end
+    end
+end
+
+-- 停止翻牌动画
+function _module:StopFlipCard()
+	if (not self._animating or self._tweener == nil) then
+		return;
+	end
+	self._animating = false;
+	CS.NiuMa.LuaDOTween.Kill(self._tweener);
+	self:ResetRotation();
+end
+
+function _module:ResetRotation()
+    local trans = self.gameObject.transform;
+    trans.localRotation = CS.UnityEngine.Quaternion(0.0, 0.0, 0.0, 1.0);
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

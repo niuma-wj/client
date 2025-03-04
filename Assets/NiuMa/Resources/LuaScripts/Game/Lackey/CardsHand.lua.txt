@@ -1,0 +1,308 @@
+-- 描述：逮狗腿手牌脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.07
+
+local base = require 'BehaviourBase';
+local Poker = require 'Common.Poker';
+local CardGenerator = require 'Game.Lackey.CardGenerator';
+local Vector2 = CS.UnityEngine.Vector2;
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("CardSelector");
+    if (child ~= nil) then
+        self._cardSelector = child.gameObject;
+    end
+    child = obj.transform:Find("BackCards");
+    if (child ~= nil) then
+        self._backCards = child.gameObject;
+		self._backs = {};
+		local child1 = nil;
+		for i = 1, 11 do
+			child1 = child:Find(string.format("Back0%02d", i));
+			if (child1 ~= nil) then
+				table.insert(self._backs, child1.gameObject);
+			end
+		end
+		for i = 1, 38 do
+			child1 = child:Find(string.format("Back%02d", i));
+			if (child1 ~= nil) then
+				table.insert(self._backs, child1.gameObject);
+			end
+		end
+    end
+    self._cards = {};
+    self._cardObjs = {};
+    self._index2Ids = {};
+    self._id2Indices = {};
+    self._sortedIds = {};
+    self._sorted = true;
+    self._selectedCards = {};
+end
+
+function _module:Start()
+    if (self._cardSelector ~= nil) then
+        self._cardSelector = self._cardSelector:GetComponent("RectangleSelector");
+    end
+    if (self._cardSelector ~= nil) then
+        self._cardSelector:AddSelectedHandler(self.OnSelectChanged);
+    end
+end
+
+function _module:DealCards(landlord)
+    if (self._backCards == nil) then
+        return;
+    end
+    self._backCards:SetActive(true);
+    local anim = self._backCards:GetComponent("Animator");
+    if (anim ~= nil) then
+        anim:Play("Default");
+        if (landlord) then
+            anim:SetTrigger("DealCard1");
+        else
+            anim:SetTrigger("DealCard2");
+        end
+    end
+end
+
+function _module:HideDealCards()
+	if (self._backCards == nil) then
+        return;
+    end
+	local anim = self._backCards:GetComponent("Animator");
+	if (anim ~= nil) then
+		anim:Play("Default");
+	end
+	local nums = #self._backs;
+	for i = 1, nums do
+		self._backs[i]:SetActive(false);
+	end
+	self._backCards:SetActive(false);
+end
+
+function _module:ClearHandCards()
+    local nums = #(self._cardObjs);
+    if (nums == 0) then
+        return;
+    end
+    local GameObject = CS.UnityEngine.GameObject;
+    for i = 1, nums do
+        if (self._cardObjs[i] ~= nil) then
+            GameObject.Destroy(self._cardObjs[i]);
+        end
+    end
+    self._cards = {};
+    self._cardObjs = {};
+    self._index2Ids = {};
+    self._id2Indices = {};
+    self._sortedIds = {};
+    self._selectedCards = {};
+end
+
+function _module:OnHandCard(msg)
+    if (msg == nil) then
+        return;
+    end
+	self:HideDealCards();
+    self:ClearHandCards();
+    local trans = self.gameObject.transform;
+    local nums = #(msg.cards);
+    self._cards = msg.cards;
+    for i = 1, nums do
+        local card = msg.cards[nums - i + 1];
+        local obj = CardGenerator.CreateCard(card.point, card.suit, false, trans);
+        obj.transform.localScale = CS.UnityEngine.Vector3(0.9, 0.9, 1.0);
+        table.insert(self._cardObjs, obj);
+        table.insert(self._index2Ids, card.id);
+        self._id2Indices[card.id] = i;
+    end
+    self._sortedIds = CardGenerator.SortCardIds(self._cards);
+    self:ReplaceCards();
+end
+
+function _module.CardPosition(idx, total)
+    local y = -220.0;
+    local nums = total - 20;
+    local tmp = idx;
+    if (nums > 0) then
+        if (idx > nums) then
+            y = -300.0;
+            tmp = idx - nums;
+            nums = 20;
+        end
+    else
+        y = -300.0;
+        nums = total;
+    end
+    local width = (nums - 1) * 48;
+    local left = -0.5 * width;
+    local x = left + (tmp - 1) * 48;
+    return Vector2(x, y);
+end
+
+-- 重新摆放手牌
+function _module:ReplaceCards()
+    self:UnselectAllCards();
+    if (self._cardSelector ~= nil) then
+        self._cardSelector:RemoveAllRectangles();
+    end
+    local pos = nil;
+    local nums = #(self._cardObjs);
+    local obj = nil;
+    local tmp = 0;
+    for i = 1, nums do
+        pos = self.CardPosition(i, nums);
+        if (self._sorted) then
+            tmp = self._sortedIds[i];
+            tmp = self._id2Indices[tmp];
+            obj = self._cardObjs[tmp];
+        else
+            obj = self._cardObjs[i];
+        end
+        if (obj ~= nil) then
+            obj.transform.anchoredPosition = pos;
+            obj.transform:SetAsLastSibling();
+        end
+        if (self._cardSelector ~= nil) then
+            self._cardSelector:AddRectangle(obj.transform);
+        end
+    end
+end
+
+function _module:SortCards()
+    self._sorted = not self._sorted;
+    self:ReplaceCards();
+end
+
+-- 选中或取消选中牌(C#调用)
+function _module.OnSelectChanged(idx)
+    local self = _module;
+    local tmp = idx + 1;
+    if (self._sorted) then
+        tmp = self._sortedIds[tmp];
+        tmp = self._id2Indices[tmp];
+    end
+    self:DoSelect(tmp);
+end
+
+function _module:DoSelect(idx)
+    local obj = self._cardObjs[idx];
+    if (obj == nil) then
+        return;
+    end
+    local sel = self._selectedCards[idx];
+    if (sel) then
+        sel = false;
+        self._selectedCards[idx] = nil;
+    else
+        sel = true;
+        self._selectedCards[idx] = true;
+    end
+    local pos = obj.transform.anchoredPosition;
+    local x = pos.x;
+    local y = pos.y;
+    if (sel) then
+        y = y + 40;
+    else
+        y = y - 40;
+    end
+    obj.transform.anchoredPosition = Vector2(x, y);
+end
+
+function _module:AllSelectedCards(ids)
+    local id = 0;
+    for k, v in pairs(self._selectedCards) do
+        if (v) then
+            table.insert(ids, self._index2Ids[k]);
+        end
+    end
+end
+
+function _module:UnselectAllCards()
+    for k, v in pairs(self._selectedCards) do
+        if (v) then
+            local obj = self._cardObjs[k];
+            if (obj ~= nil) then
+                local pos = obj.transform.anchoredPosition;
+                local x = pos.x;
+                local y = pos.y - 40;
+                obj.transform.anchoredPosition = Vector2(x, y);
+            end
+        end
+    end
+    self._selectedCards = {};
+end
+
+function _module:OnLackeyCard(id)
+    local idx = self._id2Indices[id];
+    if (idx == nil) then
+        return;
+    end
+    local obj = self._cardObjs[idx];
+    if (obj ~= nil) then
+        CardGenerator.CreateLackeyMask(true, false, obj.transform);
+    end
+end
+
+function _module:OnPlayCard(cards)
+    local nums1 = #cards;
+    local nums2 = 0;
+    local ids = {};
+    local idx = 0;
+    local card1 = nil;
+    local card2 = nil;
+    local GameObject = CS.UnityEngine.GameObject;
+    for i = 1, nums1 do
+        card1 = cards[i];
+        ids[card1.id] = true;
+        nums2 = #(self._cards);
+        for j = 1, nums2 do
+            card2 = self._cards[j];
+            if (card1.id == card2.id) then
+                table.remove(self._cards, j);
+                break;
+            end
+        end
+        idx = self._id2Indices[card1.id];
+        if (idx ~= nil and self._cardObjs[idx] ~= nil) then
+            GameObject.Destroy(self._cardObjs[idx]);
+        end
+    end
+    local id = 0;
+    local objs = {};
+    local index2IDs = {};
+    local id2Indices = {};
+    local nums3 = #(self._index2Ids);
+    for i = 1, nums3 do
+        id = self._index2Ids[i];
+        if (not ids[id]) then
+            table.insert(objs, self._cardObjs[i]);
+            table.insert(index2IDs, id);
+            id2Indices[id] = #objs;
+        end
+    end
+    self._cardObjs = objs;
+    self._index2Ids = index2IDs;
+    self._id2Indices = id2Indices;
+    self._sortedIds = CardGenerator.SortCardIds(self._cards);
+    self._selectedCards = {};
+    self:ReplaceCards();
+end
+
+function _module:OnHintCardResp(ids)
+    self:UnselectAllCards();
+    local nums = #ids;
+    if (nums == 0) then
+        return;
+    end
+    local idx = 0;
+    for i = 1, nums do
+        idx = self._id2Indices[ids[i]];
+        self:DoSelect(idx);
+    end
+end
+
+return _module;

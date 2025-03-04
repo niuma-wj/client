@@ -1,0 +1,45 @@
+-- 描述：麻将设置界面
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.10
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local ui = CS.NiuMa.LuaUGUI;
+	local child = obj.transform:Find("Frame/BtnClose");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnCloseClick);
+	end
+	child = obj.transform:Find("Frame/BtnExitRoom");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnExitClick);
+	end
+end
+
+function _module:Start()
+	self.gameObject:SetActive(false);
+end
+
+function _module.OnCloseClick()
+	local self = _module;
+	self.gameObject:SetActive(false);
+end
+
+function _module.OnExitClick()
+	--请求退出房间
+	local nm = CS.NiuMa.NetworkManager.Instance;
+	if (nm:IsConnected()) then
+		nm:SendInnerMessage("MsgLeaveVenue");
+		_module.OnCloseClick();
+	else
+		local gm = CS.NiuMa.GameManager.Instance;
+		gm:DestroyGameRoom();
+		gm:GetCapital();
+	end
+end
+
+return _module;

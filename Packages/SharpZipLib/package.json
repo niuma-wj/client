@@ -1,0 +1,25 @@
+{
+  "name": "com.greener-games.sharp-zip-lib",
+  "displayName": "Sharp Zip Lib For Unity",
+  "description": "Unity utility wrapper for Sharp lib Zip",
+  "version": "1.3.303",
+  "unity": "2020.3",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "",
+    "directory": ""
+  },
+  "bugs": {
+    "url": ""
+  },
+  "author": {
+    "name": "Greener Games"
+  },
+  "homepage": "",
+  "publishDate": "2021-01-22T14:06:59.6668582Z",
+  "samples": null,
+  "dependencies": {
+    "com.greener-games.unity-extensions": "1.0.0"
+  }
+}

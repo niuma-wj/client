@@ -1,0 +1,118 @@
+-- 描述：百人牛牛排行榜玩家脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.19
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("HeadTexture");
+    if (child ~= nil) then
+        self._headTexture = child.gameObject;
+    end
+    child = obj.transform:Find("TextGold");
+    if (child ~= nil) then
+        self._textGold = child.gameObject;
+    end
+    child = obj.transform:Find("TextName");
+    if (child ~= nil) then
+        self._textName = child.gameObject;
+    end
+    child = obj.transform:Find("TextBet");
+    if (child ~= nil) then
+        self._textAccBets20 = child.gameObject;
+    end
+    child = obj.transform:Find("TextWins");
+    if (child ~= nil) then
+        self._textAccWins20 = child.gameObject;
+    end
+    child = obj.transform:Find("Rank");
+    if (child ~= nil) then
+        self._rank = child.gameObject;
+    end
+    child = obj.transform:Find("TextRank");
+    if (child ~= nil) then
+        self._textRank = child.gameObject;
+    end
+end
+
+function _module:Start()
+end
+
+function _module:SetPlayer(rank, player)
+    local ui = CS.NiuMa.LuaUGUI;
+    if (self._textName ~= nil) then
+        ui.SetText(self._textName, player.nickname);
+    end
+    if (self._textGold ~= nil) then
+        ui.SetText(self._textGold, tostring(player.gold));
+    end
+    self:SetHeadImgUrl(player.headImgUrl);
+    if (self._textAccBets20 ~= nil) then
+        ui.SetText(self._textAccBets20, tostring(player.accBets20));
+    end
+    if (self._textAccWins20 ~= nil) then
+        ui.SetText(self._textAccWins20, tostring(player.accWins20));
+    end
+    if (player.accBets20 > 0) then
+        if (self._rank ~= nil) then
+            self._rank:SetActive(rank < 10);
+        end
+        if (self._textRank ~= nil) then
+            self._textRank:SetActive(rank > 9);
+        end
+        if (rank > 9) then
+            if (self._textRank ~= nil) then
+                ui.SetText(self._textRank, tostring(rank - 1));
+            end
+        else
+            if (self._rank ~= nil) then
+                local selector = self._rank:GetComponent("ImageSelector");
+                if (selector ~= nil) then
+                    selector:SetSprite(rank - 1);
+                end
+            end
+        end
+    else
+        if (self._rank ~= nil) then
+            self._rank:SetActive(false);
+        end
+        if (self._textRank ~= nil) then
+            self._textRank:SetActive(false);
+        end
+    end
+end
+
+function _module:SetHeadImgUrl(url)
+	if (self._headTexture == nil or url == nil or #url == 0) then
+		return;
+	end
+	local tex = CS.NiuMa.GameManager.Instance:GetTextureByUrl(url);
+	if (tex ~= nil) then
+		CS.NiuMa.LuaUGUI.SetTexture(self._headTexture, tex);
+	else
+		local func = self:OnLoadHeadTexture(url);
+		CS.NiuMa.HttpRequester.Instance:GetTexture(url, func);
+	end
+end
+
+function _module:OnLoadHeadTexture(url)
+	local inst = self;
+	return function(tex)
+		local self = inst;
+		if (self._headTexture ~= nil) then
+			CS.NiuMa.LuaUGUI.SetTexture(self._headTexture, tex);
+		end
+        CS.NiuMa.GameManager.Instance:AddTextureUrl(url, tex);
+	end
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

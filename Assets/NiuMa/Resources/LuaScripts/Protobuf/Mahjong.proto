@@ -1,0 +1,138 @@
+syntax = "proto2";
+
+message MahjongTile
+{
+	required sint32 Tile = 1;
+	required sint32 ID = 2;
+}
+
+message MahjongTileArray
+{
+	repeated MahjongTile Tiles = 1;
+}
+
+message MahjongChapter
+{
+	repeated sint32 Types = 1;
+	repeated sint32 ActionIDs = 2;
+	required sint32 TargetPlayer = 3;
+	required sint32 TargetTile = 4;
+	repeated MahjongTile Tiles = 5;
+}
+
+message MahjongChapterArray
+{
+	repeated MahjongChapter Chapters = 1;
+}
+
+message MahjongActionOption
+{
+	required sint32 ID = 1;
+	required sint32 Type = 2;
+	required sint32 Player = 3;
+	optional sint32 Tile1 = 4 [default = -1];
+	optional sint32 Tile2 = 5 [default = -1];
+}
+
+message MahjongActionOptionArray
+{
+	repeated MahjongActionOption ActionOptions = 1;
+}
+
+message NetMsgFetchTile
+{
+	required sint32 Player = 1;
+	required sint32 Nums = 2;
+	required bool Back = 3;
+	optional MahjongTile Tile = 4;
+}
+
+message NetMsgPlayTile
+{
+	required sint32 Player = 1;
+	required MahjongTile Tile = 2;
+	repeated MahjongTile HandTiles = 3;
+}
+
+message NetMsgGangTile
+{
+	required sint32 Player1 = 1;
+	optional sint32 Player2 = 2 [default = -1];
+	optional sint32 TileNums = 3 [default = 0];
+	optional sint32 Chapter = 4 [default = 0];
+	repeated MahjongTile HandTiles = 5;
+	repeated MahjongChapter Chapters = 6;
+}
+
+message NetMsgPengChiTile
+{
+	required sint32 Player1 = 1;
+	required sint32 Player2 = 2;
+	required bool PengOrChi = 3;
+	repeated MahjongTile Tiles = 4;
+	repeated MahjongTile HandTiles = 5;
+}
+
+message NetMsgHuTile
+{
+	required sint32 Player1 = 1;
+	optional sint32 Player2 = 2 [default = -1];
+	optional sint32 Player3 = 3 [default = -1];
+	required sint32 Actor = 4;
+	required bool ZiMo = 5;
+	required MahjongTile Tile = 6;
+}
+
+message NetMsgShowTiles
+{
+	repeated MahjongTile HandTiles1 = 1;
+	repeated MahjongTile HandTiles2 = 2;
+	repeated MahjongTile HandTiles3 = 3;
+	repeated MahjongTile HandTiles4 = 4;
+}
+
+message MahjongSettlement
+{
+	required bool Hu = 1;
+	required sint32 Actor = 2;
+	repeated sint32 HuWays = 3;
+	repeated sint32 HuStyles = 4;
+	repeated sint32 HuStyleExs = 5;
+	repeated sint32 Scores = 6;
+	required MahjongTile HuTile = 7;
+	repeated MahjongTile HandTiles1 = 8;
+	repeated MahjongTile HandTiles2 = 9;
+	repeated MahjongTile HandTiles3 = 10;
+	repeated MahjongTile HandTiles4 = 11;
+	repeated MahjongChapter Chapters1 = 12;
+	repeated MahjongChapter Chapters2 = 13;
+	repeated MahjongChapter Chapters3 = 14;
+	repeated MahjongChapter Chapters4 = 15;
+}
+
+message MahjongAction
+{
+	required sint32 Type = 1;
+	required sint32 Slot = 2;
+	required sint32 TileID = 3;
+}
+
+message MahjongActor
+{
+	required sint32 Seat = 1;
+	required sint32 Start = 2;
+}
+
+message MahjongPlaybackData
+{
+	repeated MahjongTile DealedTiles1 = 1;
+	repeated MahjongTile DealedTiles2 = 2;
+	repeated MahjongTile DealedTiles3 = 3;
+	repeated MahjongTile DealedTiles4 = 4;
+	repeated MahjongChapter Chapters1 = 5;
+	repeated MahjongChapter Chapters2 = 6;
+	repeated MahjongChapter Chapters3 = 7;
+	repeated MahjongChapter Chapters4 = 8;
+	repeated MahjongAction Actions = 9;
+	repeated MahjongActor Actors = 10;
+}

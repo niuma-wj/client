@@ -1,0 +1,36 @@
+-- 描述：逮狗腿动画脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.05
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+end
+
+function _module:Start()
+    self._control = self.gameObject:GetComponent("DragonBoneControl");
+    if (self._control ~= nil) then
+        self._control:AddEventHandler(self.AnimationEventHandler);
+    end
+end
+
+function _module.AnimationEventHandler(anim, eventType)
+    local self = _module;
+    if (self._control == nil) then
+        return;
+    end
+    if (eventType == "complete") then
+        if (anim == "001") then
+            self._control:FadeIn("002", 0.2);
+        elseif (anim == "002") then
+            self._control:FadeIn("003", 0.2);
+        elseif (anim == "003") then
+            self._control:FadeIn("001", 0.2);
+        end
+    end
+end
+
+return _module;

@@ -1,0 +1,70 @@
+local _module = {};
+
+_module.PokerPoint = {};
+_module.PokerPoint.Invalid = 0;
+_module.PokerPoint.Ace = 1;
+_module.PokerPoint.Two = 2;
+_module.PokerPoint.Three = 3;
+_module.PokerPoint.Four = 4;
+_module.PokerPoint.Five = 5;
+_module.PokerPoint.Six = 6;
+_module.PokerPoint.Seven = 7;
+_module.PokerPoint.Eight = 8;
+_module.PokerPoint.Nine = 9;
+_module.PokerPoint.Ten = 10;
+_module.PokerPoint.Jack = 11;
+_module.PokerPoint.Queen = 12;
+_module.PokerPoint.King = 13;
+_module.PokerPoint.Joker = 14;
+
+_module.PokerSuit = {};
+_module.PokerSuit.Invalid = 0;
+_module.PokerSuit.Diamond = 1;
+_module.PokerSuit.Club = 2;
+_module.PokerSuit.Heart = 3;
+_module.PokerSuit.Spade = 4;
+_module.PokerSuit.Little = 5;
+_module.PokerSuit.Big = 6;
+
+_module.NiuNiuGenre = {};
+_module.NiuNiuGenre.Invalid = 0; -- 无效牌型
+_module.NiuNiuGenre.Niu0 = 1;	 -- 没牛
+_module.NiuNiuGenre.Niu1 = 2;	 -- 牛一
+_module.NiuNiuGenre.Niu2 = 3;	 -- 牛二
+_module.NiuNiuGenre.Niu3 = 4;	 -- 牛三
+_module.NiuNiuGenre.Niu4 = 5;	 -- 牛四
+_module.NiuNiuGenre.Niu5 = 6;	 -- 牛五
+_module.NiuNiuGenre.Niu6 = 7;	 -- 牛六
+_module.NiuNiuGenre.Niu7 = 8;	 -- 牛七
+_module.NiuNiuGenre.Niu8 = 9;	 -- 牛八
+_module.NiuNiuGenre.Niu9 = 10;	 -- 牛九
+_module.NiuNiuGenre.NiuNiu	= 0x0010;	 -- 牛牛
+_module.NiuNiuGenre.ShunZi	= 0x0020;	 -- 顺子牛
+_module.NiuNiuGenre.WuHua	= 0x0040;	 -- 五花牛
+_module.NiuNiuGenre.TongHua	= 0x0060;	 -- 同花牛
+_module.NiuNiuGenre.HuLu	= 0x0080;	 -- 葫芦牛
+_module.NiuNiuGenre.ZhaDan	= 0x00A0;	 -- 炸弹牛
+_module.NiuNiuGenre.WuXiao	= 0x00C0;	 -- 五小牛
+_module.NiuNiuGenre.KaiXin	= 0x00E0;	 -- 开心牛
+
+_module.BiJiGenre = {};
+_module.BiJiGenre.Invalid = 0;			-- 无效牌型
+_module.BiJiGenre.Single = 1;			-- 单张(乌龙)
+_module.BiJiGenre.Pair = 2;				-- 对子
+_module.BiJiGenre.Straight = 3;			-- 顺子
+_module.BiJiGenre.Flush = 4;			-- 同花
+_module.BiJiGenre.FlushStraight = 5;	-- 同花顺
+_module.BiJiGenre.Triple = 6;			-- 三张
+
+_module.BiJiRewardType = {};
+_module.BiJiRewardType.None					= 0;		-- 无奖励
+_module.BiJiRewardType.TongGuan				= 0x01;		-- 通关
+_module.BiJiRewardType.QuanSanTiao			= 0x02;		-- 全三条
+_module.BiJiRewardType.QuanShuanZi			= 0x04;		-- 全顺子
+_module.BiJiRewardType.QuanHeiSe			= 0x08;		-- 全黑色
+_module.BiJiRewardType.QuanHongSe			= 0x10;		-- 全红色
+_module.BiJiRewardType.ShuangBaoZi			= 0x20;		-- 双豹子
+_module.BiJiRewardType.ShuangTongHuaShun	= 0x40;		-- 双同花顺
+_module.BiJiRewardType.SiZhang				= 0x80;		-- 4张
+
+return _module;

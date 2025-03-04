@@ -1,0 +1,1713 @@
+-- 描述：逮狗腿大厅界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.01.07
+
+local base = require 'BehaviourBase';
+local com_def = require 'Common.Defines';
+local Poker = require 'Common.Poker';
+local pok_def = require 'Common.PokerDefines';
+local Player = require 'Game.Lackey.Player';
+local CardGenerator = require 'Game.Lackey.CardGenerator';
+local CardsHand = require 'Game.Lackey.CardsHand';
+local CardsShow = require 'Game.Lackey.CardsShow';
+local CardsOutted = require 'Game.Lackey.CardsOutted';
+local DlgChat = require 'Game.Lackey.DlgChat';
+local DlgLocation = require 'Game.Lackey.DlgLocation';
+local DlgSetting = require 'Game.Lackey.DlgSetting';
+local DlgResult = require 'Game.Lackey.DlgResult';
+local DlgDisband = require 'Game.Lackey.DlgDisband';
+local DlgPlayerInfo = require 'Game.Lackey.DlgPlayerInfo';
+local EffectShip = require 'Game.Mahjong.EffectShip';
+local AudioControl = require 'Game.Lackey.AudioControl';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+_module.messages = "MsgLackeySyncResp,MsgAddAvatar,MsgRemoveAvatar,MsgAvatarConnect," ..
+    "MsgPlayerReadyResp,MsgPlayerAuthorizeResp,MsgLackeyDealCard,MsgPlayerDiamonds," ..
+    "MsgLackeyHandCard,MsgLackeyWaitOption,MsgWaitCallLackey,MsgCallLackeyDone," ..
+    "MsgLackeyCard,MsgLackeySeat,MsgLackeyWaitShowCard,MsgLackeyShowCard," ..
+    "MsgLackeyShowCardDone,MsgLackeyWaitPlayCard,MsgLackeyPlayCard,MsgLackeyPlayCardFailed," ..
+    "MsgLackeyXiQian,MsgLackeyCardNums,MsgLackeyCardAlert,MsgLackeyHintCardResp," ..
+    "MsgLackeyLeftCards,MsgLackeyResult,MsgLackeyDisbandVote,MsgDisbandChoice," ..
+	"MsgDisbandObsolete,MsgDisband,MsgGetDistancesResp,MsgLackeyWinLose," ..
+    "MsgChatServer,MsgEffectServer,MsgPlayerVoice,MsgLeaveVenueResp";
+
+_module.GameState = {};
+_module.GameState.Waiting = 0;  -- 正在等待游戏开始
+_module.GameState.Dealing = 1;  -- 正在发牌
+_module.GameState.Playing = 2;  -- 游戏正在进行中
+
+_module.TableLevel = {};
+_module.TableLevel.Invalid = 0;     -- 无效
+_module.TableLevel.Friend = 1;		-- 好友房
+_module.TableLevel.Beginner = 2;	-- 初级房
+_module.TableLevel.Moderate = 3;	-- 中级房
+_module.TableLevel.Advanced = 4;	-- 高级房
+_module.TableLevel.Master = 5;		-- 大师房
+
+_module.PlayCardFailed = {};
+_module.PlayCardFailed.Unknown = 0;     -- 未知错误
+_module.PlayCardFailed.CanNotPass = 1;	-- 新一轮出牌不能“不要”
+_module.PlayCardFailed.NotFound = 2;	-- 找不到指定的牌
+_module.PlayCardFailed.Invalid = 3;	    -- 无效牌型
+_module.PlayCardFailed.CanNotPlay = 4;  -- 要不起
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Sounds");
+    local child1 = nil;
+    local child2 = nil;
+	if (child ~= nil) then
+        AudioControl.gameObject = child.gameObject;
+        AudioControl:Awake();
+		self._audioCtrl = AudioControl;
+	end
+	child = obj.transform:Find("Background");
+    if (child ~= nil) then
+        child1 = child:Find("TextTime");
+        if (child1 ~= nil) then
+            self._textTime = child1.gameObject;
+        end
+        child1 = child:Find("TopBar");
+        if (child1 ~= nil) then
+            child2 = child1:Find("TextLevel");
+            if (child2 ~= nil) then
+                self._textLevel = child2.gameObject;
+            end
+            -- 底注
+            child2 = child1:Find("TextDiZhu");
+            if (child2 ~= nil) then
+                self._textDiZhu = child2.gameObject;
+            end
+            child2 = child1:Find("GouTui");
+            if (child2 ~= nil) then
+                self._gouTui = child2.gameObject;
+            end
+			child2 = child1:Find("1v4");
+			if (child2 ~= nil) then
+				self._1v4 = child2.gameObject;
+			end
+        end
+    end
+    child = obj.transform:Find("Cards");
+    if (child ~= nil) then
+        child1 = child:Find("HandCards");
+        if (child1 ~= nil) then
+            CardsHand.gameObject = child1.gameObject;
+            CardsHand:Awake();
+            self._handCards = CardsHand;
+        end
+        child1 = child:Find("OuttedCards");
+        if (child1 ~= nil) then
+            CardsOutted.gameObject = child1.gameObject;
+            CardsOutted:Awake();
+            self._outtedCards = CardsOutted;
+        end
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    child = obj.transform:Find("Buttons");
+    if (child ~= nil) then
+        child1 = child:Find("BtnTool");
+        if (child1 ~= nil) then
+            ui.AddBtnClick(child1.gameObject, self.OnToolClick);
+            child2 = child1:Find("Dir1");
+            if (child2 ~= nil) then
+                self._toolDir1 = child2.gameObject;
+            end
+            child2 = child1:Find("Dir2");
+            if (child2 ~= nil) then
+                self._toolDir2 = child2.gameObject;
+            end
+        end
+        child1 = child:Find("ToolBar");
+        if (child1 ~= nil) then
+            self._toolBar = child1.gameObject;
+			child2 = child1:Find("BtnAutoPlay");
+            if (child2 ~= nil) then
+				ui.AddBtnClick(child2.gameObject, self.OnTuoGuanClick);
+            end
+            child2 = child1:Find("BtnExit");
+            if (child2 ~= nil) then
+				ui.AddBtnClick(child2.gameObject, self.OnExitClick);
+            end
+            child2 = child1:Find("BtnLocation");
+            if (child2 ~= nil) then
+				ui.AddBtnClick(child2.gameObject, self.OnLocationClick);
+            end
+			child2 = child1:Find("BtnSetting");
+            if (child2 ~= nil) then
+				ui.AddBtnClick(child2.gameObject, self.OnSettingClick);
+            end
+        end
+        child1 = child:Find("BtnHuanZhuo");
+        if (child1 ~= nil) then
+            self._btnHuanZhuo = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnHuanZhuoClick);
+        end
+        child1 = child:Find("BtnZhunBei");
+        if (child1 ~= nil) then
+            self._btnPrepare = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnPrepareClick);
+        end
+        child1 = child:Find("BtnSortCard");
+        if (child1 ~= nil) then
+            self._btnSortCard = child1.gameObject;
+            child1 = child1:Find("Toggle");
+            if (child1 ~= nil) then
+                ui.AddToggleClick(child1.gameObject, self.OnSortCardChanged);
+            end
+        end
+        child1 = child:Find("Btn1v4");
+        if (child1 ~= nil) then
+            self._btn1v4 = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.On1v4Click);
+        end
+        child1 = child:Find("BtnCallLackey");
+        if (child1 ~= nil) then
+            self._btnCallLackey = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnCallLackeyClick);
+        end
+        child1 = child:Find("BtnBuMing");
+        if (child1 ~= nil) then
+            self._btnBuMing = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnBuMingClick);
+        end
+        child1 = child:Find("BtnMingPai");
+        if (child1 ~= nil) then
+            self._btnMingPai = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnMingPaiClick);
+        end
+        child1 = child:Find("BtnBuChu");
+        if (child1 ~= nil) then
+            self._btnBuChu = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnBuChuClick);
+        end
+        child1 = child:Find("BtnBuChu1");
+        if (child1 ~= nil) then
+            self._btnBuChu1 = child1.gameObject;
+        end
+        child1 = child:Find("BtnHint");
+        if (child1 ~= nil) then
+            self._btnHint = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnHintClick);
+        end
+        child1 = child:Find("BtnChuPai");
+        if (child1 ~= nil) then
+            self._btnChuPai = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnChuPaiClick);
+        end
+        child1 = child:Find("BtnChuPai1");
+        if (child1 ~= nil) then
+            self._btnChuPai1 = child1.gameObject;
+        end
+        child1 = child:Find("BtnYaoBuQi");
+        if (child1 ~= nil) then
+            self._btnYaoBuQi = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnBuChuClick);
+        end
+		child1 = child:Find("BtnTuoGuan");
+        if (child1 ~= nil) then
+			self._btnTuoGuan = child1.gameObject;
+            ui.AddBtnClick(child1.gameObject, self.OnTuoGuanClick);
+		end
+        child1 = child:Find("Clock");
+        if (child1 ~= nil) then
+            self._clock = child1.gameObject;
+            child2 = child1:Find("Text");
+            if (child2 ~= nil) then
+                self._textClock = child2.gameObject;
+            end
+        end
+    end
+    self._players = {};
+    child = obj.transform:Find("Players");
+    if (child ~= nil) then
+        for i = 1, 5 do
+            child1 = child:Find("Player0" .. i);
+            if (child1 ~= nil) then
+                self._players[i] = Player.NewInstance();
+                self._players[i].gameObject = child1.gameObject;
+                self._players[i]:Awake();
+				if (i > 1) then
+					child2 = child1:Find("HeadTexture/HeadFrame");
+					if (child2 ~= nil) then
+						ui.AddBtnAction(child2.gameObject, self.OnPlayerClick, i);
+					end
+				end
+            end
+        end
+		child1 = child:Find("Effects");
+		if (child1 ~= nil) then
+			self._effectParent = child1;
+		end
+		child1 = child:Find("PlayerInfo");
+		if (child1 ~= nil) then
+            DlgPlayerInfo.gameObject = child1.gameObject;
+            DlgPlayerInfo:Awake();
+			self._dlgPlayerInfo = DlgPlayerInfo;
+		end
+    end
+    self._showCards = {};
+    child = obj.transform:Find("MingPais");
+    if (child ~= nil) then
+        for i = 2, 5 do
+            child1 = child:Find("MingPai" .. i);
+            if (child1 ~= nil) then
+                self._showCards[i - 1] = CardsShow.NewInstance();
+                self._showCards[i - 1].gameObject = child1.gameObject;
+                self._showCards[i - 1]:Awake();
+                self._showCards[i - 1]:SetSeat(i);
+            end
+        end
+    end
+    child = obj.transform:Find("Popup");
+    if (child ~= nil) then
+		child1 = child:Find("Chat");
+        if (child1 ~= nil) then
+            DlgChat.gameObject = child1.gameObject;
+            DlgChat:Awake();
+            self._dlgChat = DlgChat;
+        end
+        child1 = child:Find("Location");
+        if (child1 ~= nil) then
+            DlgLocation.gameObject = child1.gameObject;
+            DlgLocation:Awake();
+            self._dlgLocation = DlgLocation;
+        end
+		child1 = child:Find("Setting");
+        if (child1 ~= nil) then
+            DlgSetting.gameObject = child1.gameObject;
+            DlgSetting:Awake();
+            self._dlgSetting = DlgSetting;
+        end
+        child1 = child:Find("Result");
+        if (child1 ~= nil) then
+            DlgResult.gameObject = child1.gameObject;
+            DlgResult:Awake();
+            self._dlgResult = DlgResult;
+        end
+		child1 = child:Find("Disband");
+        if (child1 ~= nil) then
+            DlgDisband.gameObject = child1.gameObject;
+            DlgDisband:Awake();
+            self._dlgDisband = DlgDisband;
+        end
+    end
+	self._effectID = 1;
+	self._lastOut = 1;
+	self._waitingMyself = false;
+end
+
+function _module:Start()
+    print("Start");
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:Start();
+	end
+	self:InitVoice();
+    if (self._handCards ~= nil) then
+        self._handCards:Start();
+    end
+    for i = 1, 4 do
+        if (self._showCards[i] ~= nil) then
+            self._showCards[i]:Start();
+        end
+    end
+    if (self._dlgResult ~= nil) then
+        self._dlgResult:Start();
+    end
+	if (self._dlgDisband ~= nil) then
+        self._dlgDisband:Start();
+    end
+    if (self._dlgLocation ~= nil) then
+        self._dlgLocation:Start();
+    end
+	if (self._dlgSetting ~= nil) then
+		self._dlgSetting:Start();
+		if (not self._dlgSetting:IsVoiceOn()) then
+			CS.NiuMa.GameManager.Instance:ShowPromptTip("当前已屏蔽语音，可在设置界面重新打开", 3.0);
+		end
+	end
+    local nm = CS.NiuMa.NetworkManager.Instance;
+    --请求同步逮狗腿游戏数据
+	nm:SendInnerMessage("MsgLackeySync");
+end
+
+function _module:Update()
+    self:UpdateTime();
+    self:UpdateCoutdown();
+	if ((self._dlgDisband ~= nil) and self._dlgDisband:IsVisible()) then
+        self._dlgDisband:Update();
+    end
+	if ((self._dlgChat ~= nil) and self._dlgChat:IsVisible()) then
+        self._dlgChat:Update();
+    end
+	for i = 1, 5 do
+		if (self._players[i] ~= nil and self._players[i]:IsVisible()) then
+			self._players[i]:Update();
+		end
+	end
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:Update();
+	end
+end
+
+function _module:UpdateTime()
+	if (self._textTime == nil) then
+		return;
+	end
+	local strTime = CS.NiuMa.Utility.GetTimeMMddHHmm();
+	if self._strTime ~= strTime then
+		self._strTime = strTime;
+		CS.NiuMa.LuaUGUI.SetText(self._textTime, strTime);
+	end
+end
+
+function _module:UpdateCoutdown()
+    if (not self._countingdown or self._dlgDisbanding) then
+        return;
+    end
+	local lastSec = math.floor(self._countdown + 0.5);
+    self._countdown = self._countdown - CS.UnityEngine.Time.unscaledDeltaTime;
+    if (self._countdown > 0) then
+		local sec = math.floor(self._countdown + 0.5);
+		if (self._textClock ~= nil) then
+			CS.NiuMa.LuaUGUI.SetText(self._textClock, tostring(sec));
+		end
+		if (self._waitingMyself and (lastSec ~= sec) and (sec < 6)) then
+			if (self._audioCtrl ~= nil) then
+				self._audioCtrl:PlayCountdown(sec);
+			end
+		end
+	else
+		self:EndCountdown();
+	end
+end
+
+function _module:StartCountdown(elapsed, duration)
+    if (self._clock == nil or self._textClock == nil) then
+        return;
+    end
+    self._countdown = duration - elapsed / 1000.0;
+    self._countingdown = true;
+    local sec = math.floor(self._countdown + 0.5);
+    CS.NiuMa.LuaUGUI.SetText(self._textClock, tostring(sec));
+end
+
+function _module:EndCountdown()
+    self._countingdown = false;
+	self._waitingMyself = false;
+	if (self._clock ~= nil) then
+		self._clock:SetActive(false);
+	end
+end
+
+function _module:OnMessage(msgType, json)
+	print("Process message:"..msgType);
+    if (msgType == "MsgLackeySyncResp") then
+        self:OnSyncTable(json);
+    elseif (msgType == "MsgAddAvatar") then
+		self:OnAddAvatar(json);
+	elseif (msgType == "MsgRemoveAvatar") then
+		self:OnRemoveAvatar(json);
+    elseif (msgType == "MsgAvatarConnect") then
+		self:OnAvatarConnect(json);
+	elseif (msgType == "MsgPlayerReadyResp") then
+		self:OnPlayerReady(json);
+	elseif (msgType == "MsgPlayerAuthorizeResp") then
+		self:OnPlayerAuthorize(json);
+    elseif (msgType == "MsgLackeyDealCard") then
+        self:OnDealCard(json);
+    elseif (msgType == "MsgPlayerDiamonds") then
+        self:OnPlayerDiamonds(json);
+    elseif (msgType == "MsgLackeyHandCard") then
+        self:OnHandCard(json);
+    elseif (msgType == "MsgLackeyWaitOption") then
+        self:OnWaitOption(json);
+    elseif (msgType == "MsgWaitCallLackey") then
+        self:OnCallLackey(json);
+    elseif (msgType == "MsgCallLackeyDone") then
+        self:OnCallLackeyDone();
+    elseif (msgType == "MsgLackeyCard") then
+        self:OnLackeyCard(json);
+    elseif (msgType == "MsgLackeySeat") then
+        self:OnLackeySeat(json);
+    elseif (msgType == "MsgLackeyWaitShowCard") then
+        self:OnWaitShowCard(json);
+    elseif (msgType == "MsgLackeyShowCard") then
+        self:OnShowCard(json);
+    elseif (msgType == "MsgLackeyShowCardDone") then
+        self:OnShowCardDone(json);
+    elseif (msgType == "MsgLackeyWaitPlayCard") then
+        self:OnWaitPlayCard(json);
+    elseif (msgType == "MsgLackeyPlayCard") then
+        self:OnPlayCard(json);
+    elseif (msgType == "MsgLackeyPlayCardFailed") then
+        self:OnPlayCardFailed(json);
+    elseif (msgType == "MsgLackeyXiQian") then
+        self:OnXiQian(json);
+	elseif (msgType == "MsgLackeyCardNums") then
+		self:OnCardNums(json);
+	elseif (msgType == "MsgLackeyCardAlert") then
+		self:OnCardAlert(json);
+    elseif (msgType == "MsgLackeyHintCardResp") then
+        self:OnHintCardResp(json);
+    elseif (msgType == "MsgLackeyLeftCards") then
+        self:OnLeftCards(json);
+    elseif (msgType == "MsgLackeyResult") then
+        self:OnLackeyResult(json);
+	elseif (msgType == "MsgLackeyDisbandVote") then
+        self:OnDisbandVote(json);
+    elseif (msgType == "MsgDisbandChoice") then
+        self:OnDisbandChoice(json);
+    elseif (msgType == "MsgDisbandObsolete") then
+        self:OnDisbandObsolete();
+    elseif (msgType == "MsgDisband") then
+        self:OnDisband();
+    elseif (msgType == "MsgGetDistancesResp") then
+		self:OnDistancesResponse(json);
+	elseif (msgType == "MsgLackeyWinLose") then
+		self:OnWinLose(json);
+	elseif (msgType == "MsgChatServer") then
+		self:OnChatServer(json);
+	elseif (msgType == "MsgEffectServer") then
+		self:OnEffectServer(json);
+	elseif (msgType == "MsgPlayerVoice") then
+		self:OnPlayerVoice(json);
+    elseif (msgType == "MsgLeaveVenueResp") then
+        self:OnLeaveVenueResp(json);
+    end
+end
+
+function _module:OnReconnect()
+	local nm = CS.NiuMa.NetworkManager.Instance;
+    --请求同步逮狗腿游戏数据
+	nm:SendInnerMessage("MsgLackeySync");
+end
+
+function _module:SetGeolocation()
+    --[[
+	local lat = GameManager.Instance.Latitude;
+	local lon = GameManager.Instance.Longitude;
+	local alt = GameManager.Instance.Altitude;
+	local msg = bd_pb.NetMsgFloatArray();
+	msg.Values:append(lat);
+	msg.Values:append(lon);
+	msg.Values:append(alt);
+	local pb_data = msg:SerializeToString();
+	LuaGameUtilities.SendTableMessage("PT_PLAYER_GEOLOCATION", "NetMsgFloatArray", pb_data);
+    --]]
+end
+
+function _module:HideButtons()
+    if (self._btnHuanZhuo ~= nil) then
+		self._btnHuanZhuo:SetActive(false);
+    end
+    if (self._btnPrepare ~= nil) then
+		self._btnPrepare:SetActive(false);
+    end
+    if (self._btnSortCard ~= nil) then
+		self._btnSortCard:SetActive(false);
+    end
+    if (self._btn1v4 ~= nil) then
+        self._btn1v4:SetActive(false);
+    end
+    if (self._btnCallLackey ~= nil) then
+        self._btnCallLackey:SetActive(false);
+    end
+    if (self._btnBuMing ~= nil) then
+        self._btnBuMing:SetActive(false);
+    end
+    if (self._btnMingPai ~= nil) then
+        self._btnMingPai:SetActive(false);
+    end
+    self:OnPlayCardDone();
+end
+
+function _module:ClearTable()
+    self:HideButtons();
+
+    self._landlord = -1;
+    self._lackey = -1;
+	self._lastOut = 1;
+    if (self._lackeyCard ~= nil) then
+        CS.UnityEngine.GameObject.Destroy(self._lackeyCard);
+        self._lackeyCard = nil;
+    end
+	if (self._gouTui ~= nil) then
+		self._gouTui:SetActive(false);
+	end
+	if (self._1v4 ~= nil) then
+		self._1v4:SetActive(false);
+	end
+    for i = 1, 5 do
+        if (self._players[i] ~= nil) then
+            self._players[i]:Clear();
+        end
+        if (self._outtedCards ~= nil) then
+            self._outtedCards:ClearCards(i);
+        end
+    end
+	if (self._outtedCards ~= nil) then
+		self._outtedCards:ClearLeftCards();
+	end
+    if (self._handCards ~= nil) then
+        self._handCards:ClearHandCards(i);
+    end
+    for i = 1, 4 do
+        if (self._showCards[i] ~= nil) then
+            self._showCards[i]:ClearCards(i);
+            self._showCards[i]:Show(false);
+        end
+    end
+	self:OnDisbandObsolete();
+end
+
+function _module:float_equal(x, v)
+    local EPSILON = 0.0001;
+    return ((v - EPSILON) < x) and (x < ( v + EPSILON));
+end
+
+function _module:OnSyncTable(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    self:ClearTable();
+	local msg = rapidjson.decode(json);
+    local text = "";
+    local ui = CS.NiuMa.LuaUGUI;
+    if (self._textLevel ~= nil) then
+        if (msg.level == self.TableLevel.Friend) then
+            text = "好友房(" .. tostring(msg.number) .. ")";
+        elseif (msg.level == self.TableLevel.Beginner) then
+            text = "新手房";
+        elseif (msg.level == self.TableLevel.Moderate) then
+            text = "初级房";
+        elseif (msg.level == self.TableLevel.Advanced) then
+            text = "高级房";
+        elseif (msg.level == self.TableLevel.Master) then
+            text = "顶级房";
+        end
+        ui.SetText(self._textLevel, text);
+    end
+    if (self._textDiZhu ~= nil) then
+        text = "底注:" .. tostring(msg.diZhu);
+        ui.SetText(self._textDiZhu, text);
+    end
+    self._number = msg.number;
+    self._level = msg.level;
+    self._mode = msg.mode;
+    self._diZhu = msg.diZhu;    -- 底注
+    self._gameState = msg.gameState;
+    self._seat = msg.seat;
+    self._landlord = msg.landlord;
+    if (self._dlgLocation ~= nil) then
+        self._dlgLocation:SetMyPointer(msg.seat + 1);
+    end
+    self:SetGeolocation();
+end
+
+--服务器座位号(0~4)变换到客户端座位号(1~5)
+function _module:Server2ClientSeat(s)
+	if (self._seat == nil) then
+		return -1;
+	end
+	local clientSeat = s + 5 - self._seat;
+    clientSeat = (clientSeat % 5) + 1;
+	return clientSeat;
+end
+
+function _module:Client2ServerSeat(s)
+	if (self._seat == nil) then
+		return -1;
+	end
+	local seat = (s - 1 + self._seat) % 5;
+	return seat;
+end
+
+function _module:OnAddAvatar(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+    local count = #(msg.avatars);
+	for i = 1, count do
+        local info = msg.avatars[i];
+        local clientSeat = self:Server2ClientSeat(info.seat);
+        local text = CS.NiuMa.Utility.DecodeBase64(info.base64);
+		local extraInfo = rapidjson.decode(text);
+	    self._players[clientSeat]:Show(true);
+	    self._players[clientSeat]:SetPlayId(info.playerId);
+	    self._players[clientSeat]:SetGold(extraInfo.gold);
+	    self._players[clientSeat]:SetOffline(info.offline);
+	    self._players[clientSeat]:SetReady(info.ready);
+	    self._players[clientSeat]:SetAuthorize(extraInfo.authorize);
+	    self._players[clientSeat]:SetSex(info.sex);
+	    self._players[clientSeat]:SetName(info.nickname);
+	    self._players[clientSeat]:SetHeadImgUrl(info.headUrl);
+	    self._players[clientSeat]:SetAddress(extraInfo.address);
+	    self._players[clientSeat]:SetIP(extraInfo.ip);
+	    if (clientSeat == 1) then
+            self._players[1]:ShowDiamond(self._mode == 0);
+            if (self._mode == 0) then
+                self._players[1]:SetDiamond(extraInfo.diamond);
+            end
+		    if (self._btnTuoGuan ~= nil) then
+			    self._btnTuoGuan:SetActive(extraInfo.authorize);
+		    end
+        end
+	    if (self._gameState == self.GameState.Waiting) then
+		    if (clientSeat == 1) then
+                if (self._btnPrepare ~= nil) then
+		            self._btnPrepare:SetActive(not info.ready);
+                end
+                if (not info.ready and (self._level ~= self.TableLevel.Friend)) then
+                    if (self._btnHuanZhuo ~= nil) then
+		                self._btnHuanZhuo:SetActive(true);
+                    end
+                end
+	        end
+        else
+            self._players[clientSeat]:HideReady();
+            if (self._landlord == info.seat) then
+                self._players[clientSeat]:SetBanker(true);
+            end
+	    end
+    end
+end
+
+function _module:OnRemoveAvatar(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:Clear();
+	end
+end
+
+function _module:OnAvatarConnect(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] == nil) then
+		return;
+	end
+	self._players[clientSeat]:SetOffline(msg.offline);
+    if (not msg.offline) then
+        self._players[clientSeat]:SetIP(msg.ip);
+    end
+end
+
+function _module:OnPlayerReady(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:SetReady(true);
+	end
+	if (clientSeat == 1) then
+        if (self._btnPrepare ~= nil) then
+		    self._btnPrepare:SetActive(false);
+        end
+        if (self._level ~= self.TableLevel.Friend) then
+            if (self._btnHuanZhuo ~= nil) then
+		        self._btnHuanZhuo:SetActive(false);
+            end
+        end
+	end
+end
+
+function _module:OnPlayerAuthorize(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:SetAuthorize(msg.authorize);
+	end
+	if (clientSeat == 1) then
+		if (self._btnTuoGuan ~= nil) then
+			self._btnTuoGuan:SetActive(msg.authorize);
+		end
+	end
+end
+
+function _module.OnToolClick()
+    local self = _module;
+    if (self._showTool == nil) then
+        self._showTool = true;
+    else
+        self._showTool = not self._showTool;
+    end
+    if (self._toolBar ~= nil) then
+        self._toolBar:SetActive(self._showTool);
+    end
+    if (self._toolDir1 ~= nil) then
+        self._toolDir1:SetActive(not self._showTool);
+    end
+    if (self._toolDir2 ~= nil) then
+        self._toolDir2:SetActive(self._showTool);
+    end
+end
+
+function _module.OnHuanZhuoClick()
+	local self = _module;
+    self._switchRoom = true;
+    --请求退出房间
+    local nm = CS.NiuMa.NetworkManager.Instance;
+	nm:SendInnerMessage("MsgLeaveVenue");
+end
+
+function _module.OnPrepareClick()
+	CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgPlayerReady");
+end
+
+function _module:OnDealCard(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+    self._gameState = self.GameState.Dealing;
+	self._landlord = msg.landlord;
+    local clientSeat = self:Server2ClientSeat(self._landlord);
+	for i = 1, 5 do
+		if (self._players[i] ~= nil) then
+			self._players[i]:HideReady();
+			if (clientSeat == i) then
+				self._players[i]:SetBanker(true);
+			end
+		end
+	end
+    -- 播放发牌动画
+    if (self._handCards ~= nil) then
+        self._handCards:DealCards(clientSeat == 1);
+    end
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:PlayStart();
+	end
+end
+
+function _module:OnPlayerDiamonds(json)
+    if (self._mode ~= 0) then
+        return;
+    end
+    if (self._players[1] == nil) then
+        return;
+    end
+    if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+    local nums = #(msg.seats);
+    for i = 1, nums do
+        if (msg.seats[i] == self._seat) then
+			self._players[1]:SetDiamond(msg.diamonds[i]);
+            break;
+        end
+    end
+end
+
+function _module:OnHandCard(json)
+    if (self._handCards == nil) then
+		return;
+	end
+    if (json == nil or #json == 0) then
+		return;
+	end
+    self._gameState = self.GameState.Playing;
+
+    -- 创建手牌
+    local msg = rapidjson.decode(json);
+    self._handCards:OnHandCard(msg);
+
+    -- 显示默认狗腿牌
+    if (self._gouTui ~= nil) then
+        self._gouTui:SetActive(true);
+        self:CreateLackeyCard(pok_def.PokerPoint.Eight, pok_def.PokerSuit.Heart);
+    end
+
+    if (self._btnSortCard ~= nil) then
+		self._btnSortCard:SetActive(true);
+    end
+	local clientSeat = self:Server2ClientSeat(self._landlord);
+	for i = 2, 5 do
+		if (self._players[i] ~= nil) then
+			self._players[i]:ShowCardNums(true);
+			if (clientSeat == i) then
+				self._players[i]:SetCardNums(38);
+			else
+				self._players[i]:SetCardNums(31);
+			end
+		end
+	end
+end
+
+-- 创建狗腿牌
+function _module:CreateLackeyCard(point, suit)
+    local GameObject = CS.UnityEngine.GameObject;
+    if (self._lackeyCard ~= nil) then
+        GameObject.Destroy(self._lackeyCard);
+        self._lackeyCard = nil;
+    end
+    local rm = CS.NiuMa.ResourceManager.Instance;
+    local path = "Prefabs/Game/Lackey/Cards/Small/";
+    local prefabName = path .. CardGenerator.PokerPrefab(point, suit);
+    local prefab = rm:LoadResource(prefabName, "prefabs/lackey_cards.ab", "Assets/NiuMa/Resources/", ".prefab");
+    if (prefab == nil) then
+        return;
+    end
+    self._lackeyCard = GameObject.Instantiate(prefab, self._gouTui.transform);
+    if (self._lackeyCard ~= nil) then
+        self._lackeyCard.transform.anchoredPosition = CS.UnityEngine.Vector2(20.0, 0.0);
+    end
+    prefabName = "Prefabs/Game/Lackey/Cards/Small/LackeyMask2";
+    prefab = rm:LoadResource(prefabName, "prefabs/lackey_cards.ab", "Assets/NiuMa/Resources/", ".prefab");
+    if (prefab == nil) then
+        return;
+    end
+    GameObject.Instantiate(prefab, self._lackeyCard.transform);
+end
+
+function _module.OnSortCardChanged()
+    local self = _module;
+    if (self._handCards ~= nil) then
+        self._handCards:SortCards();
+    end
+end
+
+-- 等待其他玩家操作
+function _module:OnWaitOption(json)
+    if (self._clock == nil) then
+		return;
+	end
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    local clientSeat = self:Server2ClientSeat(msg.seat); 
+    local pos = nil;
+    local Vector2 = CS.UnityEngine.Vector2;
+    if (clientSeat == 2) then
+        pos = Vector2(400.0, -20.0);
+    elseif (clientSeat == 3) then
+        pos = Vector2(400.0, 180.0);
+    elseif (clientSeat == 4) then
+        pos = Vector2(-400.0, 220.0);
+    elseif (clientSeat == 5) then
+        pos = Vector2(-400.0, 20.0);
+    else
+        return;
+    end
+	self._waitingMyself = false;
+    self._clock:SetActive(true);
+    self._clock.transform.anchoredPosition = pos;
+    self:StartCountdown(msg.elapsed, msg.duration / 1000.0);
+    if (self._outtedCards ~= nil) then
+        self._outtedCards:ClearCards(clientSeat);
+    end
+end
+
+function _module:OnCallLackey(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    if (self._btn1v4 ~= nil) then
+        self._btn1v4:SetActive(true);
+    end
+    if (self._btnCallLackey ~= nil) then
+        self._btnCallLackey:SetActive(true);
+    end
+    if (self._clock ~= nil) then
+        self._clock:SetActive(true);
+        local trans = self._clock.transform;
+        trans.anchoredPosition = CS.UnityEngine.Vector2(0.0, -60.0);
+    end
+	self._waitingMyself = true;
+    self:StartCountdown(msg.elapsed, 20.0);
+end
+
+function _module.On1v4Click()
+    local gm = CS.NiuMa.GameManager.Instance;
+    local msg = {};
+    msg.venueId = gm.VenueId;
+    msg.yes = false;
+    local json = rapidjson.encode(msg);
+	CS.NiuMa.NetworkManager.Instance:SendMessage("MsgDoCallLackey", json, true);
+end
+
+function _module.OnCallLackeyClick()
+    local gm = CS.NiuMa.GameManager.Instance;
+    local msg = {};
+    msg.venueId = gm.VenueId;
+    msg.yes = true;
+    local json = rapidjson.encode(msg);
+	CS.NiuMa.NetworkManager.Instance:SendMessage("MsgDoCallLackey", json, true);
+end
+
+function _module:OnCallLackeyDone()
+    if (self._btn1v4 ~= nil) then
+        self._btn1v4:SetActive(false);
+    end
+    if (self._btnCallLackey ~= nil) then
+        self._btnCallLackey:SetActive(false);
+    end
+    self:EndCountdown();
+end
+
+function _module:OnLackeyCard(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    if (msg.card.point ~= pok_def.PokerPoint.Eight or msg.card.suit ~= pok_def.PokerSuit.Heart) then
+        self:CreateLackeyCard(msg.card.point, msg.card.suit);
+    end
+    if (self._handCards ~= nil) then
+        self._handCards:OnLackeyCard(msg.card.id);
+    end
+    self._lackeyCardId = msg.card.id;
+    if (self._outtedCards ~= nil) then
+        self._outtedCards:SetLackeyCard(msg.card.id);
+    end
+end
+
+function _module:OnLackeySeat(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    self._lackey = msg.seat;
+    local clientSeat = self:Server2ClientSeat(msg.seat);
+    if (msg.seat == self._landlord) then
+        -- 地主1v4
+		if (self._1v4 ~= nil) then
+			self._1v4:SetActive(true);
+		end
+    else
+        if (self._players[clientSeat] ~= nil) then
+            self._players[clientSeat]:SetLackey(true);
+        end
+    end
+    -- 播放狗腿现身提示声音
+	if (msg.playSound and (self._audioCtrl ~= nil)) then
+		self._audioCtrl:PlayLackey();
+	end
+end
+
+function _module:OnWaitShowCard(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    if (self._btnBuMing ~= nil) then
+        self._btnBuMing:SetActive(true);
+    end
+    if (self._btnMingPai ~= nil) then
+        self._btnMingPai:SetActive(true);
+    end
+    if (self._clock ~= nil) then
+        self._clock:SetActive(true);
+        local trans = self._clock.transform;
+        trans.anchoredPosition = CS.UnityEngine.Vector2(0.0, -60.0);
+    end
+	self._waitingMyself = true;
+    self:StartCountdown(msg.elapsed, msg.duration / 1000.0);
+end
+
+function _module.OnBuMingClick()
+    local self = _module;
+    self:DoMingPai(false);
+end
+
+function _module.OnMingPaiClick()
+    local self = _module;
+    self:DoMingPai(true);
+end
+
+function _module:DoMingPai(val)
+    local gm = CS.NiuMa.GameManager.Instance;
+    local msg = {};
+    msg.venueId = gm.VenueId;
+    msg.yes = val;
+    local json = rapidjson.encode(msg);
+	CS.NiuMa.NetworkManager.Instance:SendMessage("MsgLackeyDoShowCard", json, true);
+end
+
+function _module:OnShowCard(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    local clientSeat = self:Server2ClientSeat(msg.seat);
+    if (clientSeat < 2 or clientSeat > 5) then
+        return;
+    end
+    local idx = clientSeat - 1;
+    if (self._showCards[idx] ~= nil) then
+        self._showCards[idx]:Show(true);
+        self._showCards[idx]:SlipOut(true);
+        self._showCards[idx]:OnShowCard(msg);
+        self._showCards[idx]:OnLackeyCard(self._lackeyCardId);
+        self._showCards[idx]:SetRole(msg.role);
+    end
+    if (self._players[clientSeat] ~= nil) then
+        self._players[clientSeat]:SetShowCard(true);
+    end
+end
+
+function _module:OnShowCardDone(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    if (self._btnBuMing ~= nil) then
+        self._btnBuMing:SetActive(false);
+    end
+    if (self._btnMingPai ~= nil) then
+        self._btnMingPai:SetActive(false);
+    end
+    self:EndCountdown();
+    if ((self._players[1] ~= nil) and msg.show) then
+        self._players[1]:SetShowCard(true);
+    end
+end
+
+function _module:OnWaitPlayCard(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    local buchu = false;
+    local buchu1 = false;
+    local hint = false;
+    local chuPai = false;
+    local yaoBuQi = false;
+    if (msg.firstPlay) then
+        --新一轮出牌
+        buchu1 = true;
+        hint = true;
+        chuPai = true;
+    elseif (msg.canPlay) then
+        buchu = true;
+        hint = true;
+        chuPai = true;
+    else
+        yaoBuQi = true;
+    end
+    if (buchu and self._btnBuChu ~= nil) then
+        self._btnBuChu:SetActive(true);
+    end
+    if (buchu1 and self._btnBuChu1 ~= nil) then
+        self._btnBuChu1:SetActive(true);
+    end
+    if (hint and self._btnHint ~= nil) then
+        self._btnHint:SetActive(true);
+    end
+    if (chuPai and self._btnChuPai ~= nil) then
+        self._btnChuPai:SetActive(true);
+    end
+    if (yaoBuQi and self._btnYaoBuQi ~= nil) then
+        self._btnYaoBuQi:SetActive(true);
+    end
+    if (self._clock ~= nil) then
+        self._clock:SetActive(true);
+        self._clock.transform.anchoredPosition = CS.UnityEngine.Vector2(-120.0, -60.0);
+    end
+	self._waitingMyself = true;
+    self:StartCountdown(msg.elapsed, 15.0);
+
+    if (self._outtedCards ~= nil) then
+        self._outtedCards:ClearCards(1);
+    end
+end
+
+function _module.OnBuChuClick()
+    local gm = CS.NiuMa.GameManager.Instance;
+    local msg = {};
+    msg.venueId = gm.VenueId;
+    msg.pass = true;
+    local json = rapidjson.encode(msg);
+	CS.NiuMa.NetworkManager.Instance:SendMessage("MsgLackeyDoPlayCard", json, true);
+end
+
+function _module.OnTuoGuanClick()
+	CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgPlayerAuthorize");
+end
+
+function _module.OnHintClick()
+    CS.NiuMa.NetworkManager.Instance:SendInnerMessage("MsgLackeyHintCard");
+end
+
+function _module.OnChuPaiClick()
+    local self = _module;
+    if (self._handCards == nil) then
+        return;
+    end
+    local ids = {};
+    self._handCards:AllSelectedCards(ids);
+    local nums = #ids;
+    if (nums == 0) then
+        CS.NiuMa.GameManager.Instance:ShowPromptTip("未选中任何牌", 2.0);
+        return;
+    end
+    local gm = CS.NiuMa.GameManager.Instance;
+    local msg = {};
+    msg.venueId = gm.VenueId;
+    msg.pass = false;
+    msg.cardIds = {};
+    for i = 1, nums do
+        table.insert(msg.cardIds, ids[i]);
+    end
+    local json = rapidjson.encode(msg);
+	CS.NiuMa.NetworkManager.Instance:SendMessage("MsgLackeyDoPlayCard", json, true);
+end
+
+function _module:OnPlayCard(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    local clientSeat = self:Server2ClientSeat(msg.seat);
+    local role = 2;
+    if (msg.seat == self._landlord) then
+        role = 0;
+    elseif (msg.seat == self._lackey) then
+        role = 1;
+    end
+    if (self._outtedCards ~= nil) then
+        self._outtedCards:OnPlayCard(clientSeat, role, msg.xiQian, msg.genre, msg.pass, msg.realTime, msg.cards);
+    end
+    if (msg.realTime) then
+        if (clientSeat == 1) then
+            if (self._handCards ~= nil) then
+                self._handCards:OnPlayCard(msg.cards);
+            end
+            self:OnPlayCardDone();
+        elseif ((self._players[clientSeat] ~= nil) and self._players[clientSeat]:IsShowCard()) then
+            local idx = clientSeat - 1;
+            if (self._showCards[idx] ~= nil) then
+                self._showCards[idx]:OnPlayCard(msg.cards);
+            end
+        end
+		if (self._audioCtrl ~= nil) then
+			local sex = 0;
+			if (self._players[clientSeat] ~= nil) then
+				sex = self._players[clientSeat]:GetSex();
+			end
+			if (msg.pass) then
+				self._audioCtrl:PlayPass(sex == 1, clientSeat);
+			else
+				local card = msg.cards[1];
+				self._audioCtrl:PlayGenre(sex == 1, msg.genre, card, clientSeat, self._lastOut);
+			end
+		end
+		if (not msg.pass) then
+			self._lastOut = clientSeat;
+		end
+    end
+end
+
+function _module:OnPlayCardDone()
+    if (self._btnBuChu ~= nil) then
+        self._btnBuChu:SetActive(false);
+    end
+    if (self._btnBuChu1 ~= nil) then
+        self._btnBuChu1:SetActive(false);
+    end
+    if (self._btnHint ~= nil) then
+        self._btnHint:SetActive(false);
+    end
+    if (self._btnChuPai ~= nil) then
+        self._btnChuPai:SetActive(false);
+    end
+    if (self._btnYaoBuQi ~= nil) then
+        self._btnYaoBuQi:SetActive(false);
+    end
+    self:EndCountdown();
+end
+
+function _module:OnPlayCardFailed(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    local text = "";
+    if (msg.reason == self.PlayCardFailed.CanNotPass) then
+        text = "必须出牌";
+    elseif (msg.reason == self.PlayCardFailed.NotFound) then
+        text = "出牌失败，找不到指定的牌";
+    elseif (msg.reason == self.PlayCardFailed.Invalid) then
+        text = "出牌失败，当前选中的牌不能组成有效牌型";
+    elseif (msg.reason == self.PlayCardFailed.CanNotPlay) then
+        text = "出牌失败，请选择更大的牌型";
+    else
+        text = "出牌失败，未知错误";
+    end
+    CS.NiuMa.GameManager.Instance:ShowPromptTip(text, 2.0);
+end
+
+function _module:OnXiQian(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    local clientSeat = self:Server2ClientSeat(msg.seat);
+    if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:SetXiQian(msg.xiQian, msg.realTime);
+	end
+end
+
+function _module:OnCardNums(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (clientSeat < 2 or clientSeat > 5) then
+		return;
+	end
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:SetCardNums(msg.cardNums);
+	end
+end
+
+function _module:OnCardAlert(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (clientSeat < 2 or clientSeat > 5) then
+		return;
+	end
+	if (self._outtedCards ~= nil) then
+        self._outtedCards:OnCardAlert(clientSeat);
+    end
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:PlayAlert();
+	end
+end
+
+function _module:OnHintCardResp(json)
+    if (json == nil or #json == 0) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    if (self._handCards ~= nil) then
+        self._handCards:OnHintCardResp(msg.cardIds);
+    end
+end
+
+function _module:OnLeftCards(json)
+    if (json == nil or #json == 0 or self._outtedCards == nil) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    local leftCards = {};
+    leftCards[1] = msg.Cards1;
+    leftCards[2] = msg.Cards2;
+    leftCards[3] = msg.Cards3;
+    leftCards[4] = msg.Cards4;
+    leftCards[5] = msg.Cards5;
+    local clientSeat = 0;
+    for i = 0, 4 do
+        clientSeat = self:Server2ClientSeat(i);
+        self._outtedCards:CreateLeftCards(clientSeat, leftCards[i + 1]);
+    end
+end
+
+function _module:OnLackeyResult(json)
+    if (json == nil or #json == 0 or self._dlgResult == nil) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    local headTexs = {};
+    local names = {};
+    local clientSeat = 0;
+    local gold = 0;
+	local winOrLose = 0;
+    for i = 1, 5 do
+        clientSeat = self:Server2ClientSeat(i - 1);
+        gold = msg.results[i].gold;
+        if (self._players[clientSeat] ~= nil) then
+            headTexs[i] = self._players[clientSeat]:GetHeadTexture();
+            names[i] = self._players[clientSeat]:GetName();
+            self._players[clientSeat]:SetGold(gold);
+        end
+        if (clientSeat == 1) then
+            CS.NiuMa.GameManager.Instance.Gold = gold;
+			gold = msg.results[i].winGold;
+			if (gold > 0) then
+				winOrLose = 1;
+			elseif (gold < 0) then
+				winOrLose = 2;
+			end
+        end
+    end
+    self._dlgResult:Show(true);
+    self._dlgResult:OnLackeyResult(msg, headTexs, names, self._diZhu, self._seat, self._landlord, self._lackey, winOrLose);
+	if (self._audioCtrl ~= nil) then
+		self._audioCtrl:PlayResult(winOrLose);
+	end
+end
+
+function _module:OnDisbandVote(json)
+    if (json == nil or #json == 0 or self._dlgDisband == nil) then
+		return;
+	end
+	self._dlgDisbanding = true;
+    local msg = rapidjson.decode(json);
+    self._dlgDisband:Show(true);
+    local names = {};
+    local clientSeat = 0;
+    for i = 0, 4 do
+        clientSeat = self:Server2ClientSeat(i);
+        table.insert(names, self._players[clientSeat]:GetName());
+    end
+    self._dlgDisband:OnDisbandVote(msg, names, self._seat);
+end
+
+function _module:OnDisbandChoice(json)
+    if (json == nil or #json == 0 or self._dlgDisband == nil) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    self._dlgDisband:OnDisbandChoice(msg.seat, self._seat, msg.choice);
+end
+
+function _module:OnDisbandObsolete()
+	self._dlgDisbanding = false;
+    if (self._dlgDisband ~= nil) then
+		self._dlgDisband:Show(false);
+	end
+end
+
+function _module.OnExitClick()
+    local self = _module;
+    self._switchRoom = false;
+    --请求退出房间
+    local nm = CS.NiuMa.NetworkManager.Instance;
+    if (nm:IsConnected()) then
+	    nm:SendInnerMessage("MsgLeaveVenue");
+    else
+        self.ExitRoom();
+    end
+end
+
+function _module.ExitRoom()
+    local gm = CS.NiuMa.GameManager.Instance;
+    gm:DestroyGameRoom();
+	gm:GetCapital();
+end
+
+function _module:OnLeaveVenueResp(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	if (msg.result == 0) then
+        if (self._switchRoom) then
+            --切换房间
+            local id = 0;
+	        if (self._level == self.TableLevel.Beginner) then
+		        id = com_def.DistrictId.LackeyBeginner;
+	        elseif (self._level == self.TableLevel.Moderate) then
+		        id = com_def.DistrictId.LackeyModerate;
+	        elseif (self._level == self.TableLevel.Advanced) then
+		        id = com_def.DistrictId.LackeyAdvanced;
+	        elseif (self._level == self.TableLevel.Master) then
+		        id = com_def.DistrictId.LackeyMaster;
+	        else
+		        self.ExitRoom();
+		        return;
+	        end
+            local gm = CS.NiuMa.GameManager.Instance;
+            gm.VenueId = "";
+            local url = "/player/game/enter/district?districtId=" .. tostring(id);
+	        gm:AuthPost(url, nil, self.OnEnterResponse);
+        else
+		    --离开成功，直接退出
+		    self.ExitRoom();
+        end
+	elseif (not self._switchRoom) then
+		--离开失败，请求解散
+        local nm = CS.NiuMa.NetworkManager.Instance;
+		nm:SendInnerMessage("MsgDisbandRequest");
+	end
+    self._switchRoom = false;
+end
+
+function _module.OnEnterResponse(code, text)
+	local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code == 200) then
+		gm:EnterVenue(t.address, t.venueId, com_def.GameType.Lackey, self.OnEnterVenue);
+	end
+end
+
+function _module.OnEnterVenue()
+    local nm = CS.NiuMa.NetworkManager.Instance;
+    --请求同步逮狗腿游戏数据
+	nm:SendInnerMessage("MsgLackeySync");
+end
+
+function _module:OnDisband()
+	CS.NiuMa.GameManager.Instance:ShowPromptDialog("房间已解散，请点击确定返回大厅。", self.ExitRoom);
+end
+
+function _module.OnLocationClick()
+    local self = _module;
+    if (self._dlgLocation == nil) then
+        return;
+    end
+    local test1 = false;
+    local test2 = false;
+    local clientSeat = 0;
+    local name = "";
+    local ip = "";
+    local addr = "";
+    local ips = {};
+    local playerId = nil;
+    for i = 1, 5 do
+        clientSeat = self:Server2ClientSeat(i - 1);
+        if (self._players[clientSeat] ~= nil) then
+            playerId = self._players[clientSeat]:GetPlayerId();
+        else
+            playerId = nil;
+        end
+        if ((playerId ~= nil) and (#playerId ~= 0)) then
+            ips[i] = self._players[clientSeat]:GetIP();
+        else
+            ips[i] = "";
+        end
+    end
+    for i = 1, 5 do
+        clientSeat = self:Server2ClientSeat(i - 1);
+        if (self._players[clientSeat] ~= nil) then
+            playerId = self._players[clientSeat]:GetPlayerId();
+        else
+            playerId = nil;
+        end
+        if ((playerId ~= nil) and (#playerId ~= 0)) then
+            test1 = true;
+            name = self._players[clientSeat]:GetName();
+            addr = self._players[clientSeat]:GetAddress();
+        else
+            test1 = false;
+        end
+        self._dlgLocation:ShowPlayer(i, test1);
+        if (test1) then
+            test2 = false;
+            for j = 1, 5 do
+                if (i ~= j and ips[i] == ips[j]) then
+                    test2 = true;
+                    break;
+                end
+            end
+            self._dlgLocation:SetName(i, name);
+            self._dlgLocation:SetIP(i, ips[i], test2);
+            self._dlgLocation:SetAddress(i, addr);
+        end
+    end
+    self._dlgLocation:Show(true);
+    --获取玩家之间的距离
+    local nm = CS.NiuMa.NetworkManager.Instance;
+	nm:SendInnerMessage("MsgGetDistances");
+end
+
+function _module:OnDistancesResponse(json)
+    if (json == nil or #json == 0 or self._dlgLocation == nil) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    for i = 1, 10 do
+        self._dlgLocation:SetDistance(i, msg.distances[i]);
+    end
+end
+
+function _module:OnWinLose(json)
+    if (json == nil or #json == 0 or self._dlgLocation == nil) then
+		return;
+	end
+    local msg = rapidjson.decode(json);
+    local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+        self._players[clientSeat]:SetWinLose(msg.win, msg.lose, msg.draw);
+    end
+end
+
+function _module.OnPlayerClick(idx)
+	if (idx < 2 or idx > 5) then
+		return;
+	end
+    local self = _module;
+	if (self._dlgPlayerInfo == nil) then
+		return;
+	end
+	local playerId = nil;
+	if (self._players[idx] ~= nil) then
+		playerId = self._players[idx]:GetPlayerId();
+	end
+	if ((playerId == nil) or (#playerId == 0)) then
+		return;
+	end
+	self._dlgPlayerInfo:Show(true);
+	self._dlgPlayerInfo:SetPosition(idx);
+	self._dlgPlayerInfo:SetPlayerId(playerId);
+	self._dlgPlayerInfo:SetName(self._players[idx]:GetName());
+	self._dlgPlayerInfo:SetSex(self._players[idx]:GetSex());
+	self._dlgPlayerInfo:SetIP(self._players[idx]:GetIP());
+	self._dlgPlayerInfo:SetAddress(self._players[idx]:GetAddress());
+	local win, lose, draw = self._players[idx]:GetWinLose();
+	self._dlgPlayerInfo:SetWinLose(win, lose, draw);
+end
+
+function _module.OnSettingClick()
+    local self = _module;
+	if (self._dlgSetting ~= nil) then
+		self._dlgSetting:Show(true);
+	end
+end
+
+function _module:OnChatServer(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+	if (self._players[clientSeat] ~= nil) then
+		if (msg.type == 1) then
+			self._players[clientSeat]:SetChatEmoji(msg.index);
+		elseif (msg.type == 2) then
+			self._players[clientSeat]:SetChatPhrase(msg.index);
+            if (self._audioCtrl ~= nil) then
+                local sex = self._players[clientSeat]:GetSex();
+                self._audioCtrl:PlayPhrase((sex == 1), clientSeat, msg.index);
+            end
+		elseif (msg.type == 3) then
+			self._players[clientSeat]:SetChatText(msg.text);
+		end
+	end
+end
+
+function _module:OnEffectServer(json)
+	if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	if (msg.index < 1 or msg.index > 5) then
+		return;
+	end
+    local clientSeat1 = self:Server2ClientSeat(msg.srcSeat);
+    local clientSeat2 = self:Server2ClientSeat(msg.dstSeat);
+    local prefabName = "";
+    local live = 1.0;
+    if (msg.index == 1) then
+        prefabName = "Prefabs/Game/Lackey/Effects/Props/flower";
+    elseif (msg.index == 2) then
+        prefabName = "Prefabs/Game/Lackey/Effects/Props/bomb";
+    elseif (msg.index == 3) then
+        prefabName = "Prefabs/Game/Lackey/Effects/Props/tuoxie";
+    elseif (msg.index == 4) then
+        prefabName = "Prefabs/Game/Lackey/Effects/Props/chicken";
+        live = 1.34;
+	else
+		prefabName = "Prefabs/Game/Lackey/Effects/Props/dog";
+    end
+    local rm = CS.NiuMa.ResourceManager.Instance;
+    local prefab = rm:LoadResource(prefabName, "prefabs/lackey_effects.ab", "Assets/NiuMa/Resources/", ".prefab");
+    if (prefab == nil) then
+        return;
+    end
+    local prefabShip = rm:LoadResource("Prefabs/Game/Lackey/Effects/Props/EffectShip", "prefabs/lackey_effects.ab", "Assets/NiuMa/Resources/", ".prefab");
+    if (prefabShip == nil) then
+        return;
+    end
+    local obj = CS.UnityEngine.GameObject.Instantiate(prefabShip, self._effectParent);
+    local effectShip = EffectShip.NewInstance();
+    effectShip.gameObject = obj;
+	effectShip:Awake();
+    effectShip:SetOwner(self);
+    effectShip:SetID(self._effectID);
+    effectShip:SetEffect(msg.index);
+	effectShip:SetFace(msg.index - 1);
+    effectShip:SetThrower(clientSeat1);
+    if (self._effects == nil) then
+        self._effects = {};
+    end
+    self._effects[self._effectID] = effectShip;
+    self._effectID = self._effectID + 1;
+    if (self._effectID > 100000) then
+        self._effectID = 1;
+    end
+    local startPoint = self._players[clientSeat1]:GetHeadPosition(self._effectParent);
+    local endPoint = self._players[clientSeat2]:GetHeadPosition(self._effectParent);
+    effectShip:ThrowEffect(startPoint, endPoint, prefab, live);
+end
+
+function _module:OnShipEffect(id, effect, thrower)
+    self._effects[id] = nil;
+    if (self._audioCtrl ~= nil) then
+        self._audioCtrl:PlayProp(thrower, effect);
+    end
+end
+
+function _module:InitVoice()
+	local listener = self.gameObject:GetComponent("VoiceListener");
+	if (listener == nil) then
+		return;
+	end
+	listener:AddRecordCompletedHandler(self.OnRecordCompleted);
+	listener:AddPlayStartHandler(self.OnPlayStart);
+	listener:AddPlayStopHandler(self.OnPlayEnd);
+end
+
+function _module.OnRecordCompleted(fileName)
+	--语音录制完成
+	local nm = CS.NiuMa.NetworkManager.Instance;
+	local vm = CS.NiuMa.VoiceManager.Instance;
+	--发送语音消息
+	nm:SendVoiceMessage(fileName);
+	--将录制的mp3文件压入播放队列
+	vm:PushVoice(fileName, 1);
+end
+
+function _module.OnPlayStart(clientSeat)
+    local self = _module;
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:ShowChatTalk(true);
+	end
+end
+
+function _module.OnPlayEnd(clientSeat)
+    local self = _module;
+	if (self._players[clientSeat] ~= nil) then
+		self._players[clientSeat]:ShowChatTalk(false);
+	end
+end
+
+function _module:OnPlayerVoice(json)
+	if (self._dlgSetting ~= nil) then
+		if (not self._dlgSetting:IsVoiceOn()) then
+			return;
+		end
+	end
+    if (json == nil or #json == 0) then
+		return;
+	end
+	local msg = rapidjson.decode(json);
+	local clientSeat = self:Server2ClientSeat(msg.seat);
+    CS.NiuMa.VoiceManager.Instance:PushVoice(msg.fileName, clientSeat);
+end
+
+return _module;

@@ -1,0 +1,147 @@
+-- 描述：比鸡公开房脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2024.12.26
+
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("HeadFrame/HeadTexture");
+    if (child ~= nil) then
+        self._headTexture = child.gameObject;
+    end
+    child = obj.transform:Find("TextName");
+    if (child ~= nil) then
+        self._textName = child.gameObject;
+    end
+    child = obj.transform:Find("TextMode");
+    if (child ~= nil) then
+        self._textMode = child.gameObject;
+    end
+    child = obj.transform:Find("TextDiZhu");
+    if (child ~= nil) then
+        self._textDiZhu = child.gameObject;
+    end
+    child = obj.transform:Find("TextPlayerNums");
+    if (child ~= nil) then
+        self._textPlayerNums = child.gameObject;
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    child = obj.transform:Find("BtnJoin");
+    if (child ~= nil) then
+        local func = self:OnJoinClick();
+        ui.AddBtnClick(child.gameObject, func);
+    end
+    child = obj.transform:Find("Private");
+    if (child ~= nil) then
+        self._private = child.gameObject;
+    end
+end
+
+function _module:Start()
+end
+
+function _module:SetEnterCallback(callback)
+    self._enterCallback = callback;
+end
+
+function _module:SetRoomItem(item)
+    self._venueId = item.venueId;
+    self._gameType = item.gameType;
+    self._number = item.number;
+    local ui = CS.NiuMa.LuaUGUI;
+    if (self._textGold ~= nil) then
+        ui.SetText(self._textGold, "");
+    end
+    if (self._textName ~= nil) then
+        ui.SetText(self._textName, item.ownerName);
+    end
+    if (self._headTexture ~= nil and item.ownerHeadUrl ~= nil) then
+		local tex = CS.NiuMa.GameManager.Instance:GetTextureByUrl(item.ownerHeadUrl);
+		if (tex ~= nil) then
+			ui.SetTexture(self._headTexture, tex);
+		else
+			local func = self:OnLoadHeadTexture();
+		    CS.NiuMa.HttpRequester.Instance:GetTexture(item.ownerHeadUrl, func);
+		end
+	end
+    if (self._textMode ~= nil) then
+        if (item.mode == 0) then
+            ui.SetText(self._textMode, "扣钻");
+        else
+            ui.SetText(self._textMode, "扣利");
+        end
+    end
+    if (self._textDiZhu ~= nil) then
+        ui.SetText(self._textDiZhu, tostring(item.diZhu));
+    end
+    if (self._textPlayerNums ~= nil) then
+        local text = "";
+        if (item.maxPlayerNums ~= nil and
+            item.maxPlayerNums ~= rapidjson.null and
+            item.maxPlayerNums > 0) then
+            text = tostring(item.playerCount) .. "/" .. tostring(item.maxPlayerNums) .. "人";
+        else
+            text = tostring(item.playerCount) .. "人";
+        end
+        ui.SetText(self._textPlayerNums, text);
+    end
+end
+
+function _module:OnLoadHeadTexture()
+	local inst = self;
+    return function(tex)
+		local self = inst;
+        CS.NiuMa.LuaUGUI.SetTexture(self._headTexture, tex);
+    end
+end
+
+function _module:OnJoinClick()
+    local inst = self;
+    return function()
+        local self = inst;
+        if (self._venueId == nil or self._gameType == nil) then
+            return;
+        end
+        local t = {};
+	    t.venueId = self._venueId;
+	    t.gameType = self._gameType;
+	    local body = rapidjson.encode(t);
+        local func = self:OnEnterResponse();
+	    CS.NiuMa.GameManager.Instance:AuthPost("/player/game/enter", body, func);
+    end
+end
+
+function _module:OnEnterResponse()
+    local inst = self;
+    return function(code, text)
+	    local self = inst;
+        local gm = CS.NiuMa.GameManager.Instance;
+        local t = rapidjson.decode(text);
+        if (code ~= 200) then
+		    --加入失败
+		    local errMsg = "";
+            if (t.msg ~= nil) then
+                errMsg = t.msg;
+            else
+                errMsg = text;
+            end
+		    errMsg = "加入房间失败："..errMsg;
+            gm:ShowPromptDialog(errMsg);
+	    else
+		    --加入成功，直接进入
+		    gm:EnterVenue(t.address, t.venueId, self._gameType, self._enterCallback);
+	    end
+    end
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

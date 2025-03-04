@@ -1,0 +1,461 @@
+local base = require 'BehaviourBase';
+local mah_def = require 'Game.Mahjong.MahjongDefines';
+local mah_gen = require 'Game.Mahjong.MahjongGenerator';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local ui = CS.NiuMa.LuaUGUI;
+    local child = obj.transform:Find("BtnPlay");
+    if (child ~= nil) then
+        self._btnPlay = child.gameObject;
+        ui.AddBtnClick(child.gameObject, self.OnPlayClick);
+    end
+    child = obj.transform:Find("BtnPause");
+    if (child ~= nil) then
+        self._btnPause = child.gameObject;
+        ui.AddBtnClick(child.gameObject, self.OnPauseClick);
+    end
+    child = obj.transform:Find("BtnSpeedDown");
+    if (child ~= nil) then
+        self._btnSpeedDown = child.gameObject;
+        ui.AddBtnClick(child.gameObject, self.OnSpeedDownClick);
+    end
+    child = obj.transform:Find("GraySpeedDown");
+    if (child ~= nil) then
+        self._graySpeedDown = child.gameObject;
+    end
+    child = obj.transform:Find("BtnSpeedUp");
+    if (child ~= nil) then
+        self._btnSpeedUp = child.gameObject;
+        ui.AddBtnClick(child.gameObject, self.OnSpeedUpClick);
+    end
+    child = obj.transform:Find("GraySpeedUp");
+    if (child ~= nil) then
+        self._graySpeedUp = child.gameObject;
+    end
+    child = obj.transform:Find("BtnExit");
+    if (child ~= nil) then
+        self._btnExit = child.gameObject;
+        ui.AddBtnClick(child.gameObject, self.OnExitClick);
+    end
+    child = obj.transform:Find("TextPercent");
+    if (child ~= nil) then
+        self._textPercent = child.gameObject;
+    end
+    child = obj.transform:Find("TextSpeed");
+    if (child ~= nil) then
+        self._textSpeed = child.gameObject;
+    end
+    self._paused = false;
+    self._elapsed = 0.0;
+    self._speedNums = 0;
+    self._speed = 1.0;
+    self._showSpeed = false;
+    self._showSpeedElapsed = 0.0;
+end
+
+function _module:Start()
+end
+
+function _module:Update()
+    self:UpdatePlayback();
+    self:UpdateShowSpeed();
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetRoom(r)
+    self._room = r;
+end
+
+function _module:SetPlayback(data, nicknames)
+    self._playbackData = data;
+    self._nicknames = nicknames;
+end
+
+function _module.OnPlayClick()
+    local self = _module;
+    self._paused = false;
+    if (self._btnPlay ~= nil) then
+        self._btnPlay:SetActive(false);
+    end
+    if (self._btnPause ~= nil) then
+        self._btnPause:SetActive(true);
+    end
+end
+
+function _module.OnPauseClick()
+    local self = _module;
+    self._paused = true;
+    if (self._btnPlay ~= nil) then
+        self._btnPlay:SetActive(true);
+    end
+    if (self._btnPause ~= nil) then
+        self._btnPause:SetActive(false);
+    end
+end
+
+function _module.OnSpeedDownClick()
+    local self = _module;
+    if (self._speedNums < -3) then
+        return;
+    end
+    self._speedNums = self._speedNums - 1;
+    self:UpdateSpeed();
+end
+
+function _module.OnSpeedUpClick()
+    local self = _module;
+    if (self._speedNums > 4) then
+        return;
+    end
+    self._speedNums = self._speedNums + 1;
+    self:UpdateSpeed();
+end
+
+function _module:UpdateSpeed()
+    if (self._btnSpeedDown ~= nil) then
+        self._btnSpeedDown:SetActive(self._speedNums > -4);
+    end
+    if (self._graySpeedDown ~= nil) then
+        self._graySpeedDown:SetActive(self._speedNums < -3);
+    end
+    if (self._btnSpeedUp ~= nil) then
+        self._btnSpeedUp:SetActive(self._speedNums < 4);
+    end
+    if (self._graySpeedUp ~= nil) then
+        self._graySpeedUp:SetActive(self._speedNums > 3);
+    end
+    local tmp = self._speedNums;
+    if (tmp < 0) then
+        tmp = tmp * -1;
+    end
+    tmp = tmp + 1;
+    if (self._speedNums > 0) then
+        self._speed = 1.0 / tmp;
+    else
+        self._speed = tmp;
+    end
+    self:ShowSpeed();
+end
+
+function _module:ShowSpeed()
+    if (self._textSpeed == nil) then
+        return;
+    end
+    self._showSpeed = true;
+    self._showSpeedElapsed = 0.0;
+    self._textSpeed:SetActive(true);
+    local text = CS.System.String.Format("速率:X{0:0.##}倍", (1.0 / self._speed));
+    CS.NiuMa.LuaUGUI.SetText(self._textSpeed, text);
+end
+
+function _module:UpdateShowSpeed()
+    if (not self._showSpeed) then
+        return;
+    end
+    self._showSpeedElapsed = self._showSpeedElapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+    if (self._showSpeedElapsed < 3.0) then
+        return;
+    end
+    self._showSpeed = false;
+    self._textSpeed:SetActive(false);
+end
+
+function _module.OnExitClick()
+    --请求退出房间
+	CS.NiuMa.GameManager.Instance:DestroyGameRoom();
+end
+
+function _module:StartPlayback()
+    if (self._room == nil or self._playbackData == nil) then
+        return;
+    end
+    local paver = self._room:GetPaver();
+    if (paver == nil) then
+        return;
+    end
+    self._handTiles = {};
+    for i = 1, 4 do
+        local tiles = self._playbackData.dealedTiles[i];
+        local clientSeat = self._room:Server2ClientSeat(i - 1);
+        paver:CreateShowTiles(clientSeat, tiles);
+        self._handTiles[i] = {};
+        for j = 1, #tiles do
+            table.insert(self._handTiles[i], tiles[j]);
+        end
+        --local text = rapidjson.encode(self._handTiles[i]);
+        --print("ClientSeat: " .. tostring(clientSeat) .. ", handTiles: " .. text);
+    end
+    self._action = 1;
+end
+
+function _module:UpdatePlayback()
+    if (not self._action or self._paused) then
+        return;
+    end
+    local actions = self._playbackData.actions;
+    if (self._action > #actions) then
+        return;
+    end
+    local action = actions[self._action];
+    if (action.eType == mah_def.MahjongAction.Fetch) then
+        self._elapsed = 0.0;
+    else
+        self._elapsed = self._elapsed + CS.UnityEngine.Time.unscaledDeltaTime;
+        local elapsed = 1.5 * self._speed;
+        if (self._elapsed < elapsed) then
+            return;
+        end
+        self._elapsed = self._elapsed - elapsed;
+    end
+    self:PlaybackOneAction(action, actions);
+end
+
+function _module:PlaybackOneAction(action, actions)
+    if (action == nil or actions == nil) then
+        return;
+    end
+    local paver = self._room:GetPaver();
+    local actors = self._playbackData.actors;
+    local actor = actors[action.slot + 1];
+    local actorSeat = actor.player + 1;
+    local clientSeat = self._room:Server2ClientSeat(actor.player);
+    local nums = 0;
+    local mt = nil;
+    local toEnd = false;
+    if (action.type == mah_def.MahjongAction.Fetch) then
+        nums = #(self._handTiles[actorSeat]);
+        --print("ClientSeat: " .. tostring(clientSeat) .. ", fetch tile id: " .. tostring(action.tile));
+        mt = mah_gen.TileFromID(action.tile);
+        local inserted = false;
+        for j = 1, nums do
+            if (self._handTiles[actorSeat][j].id > action.tile) then
+                table.insert(self._handTiles[actorSeat], j, mt);
+                inserted = true;
+                break;
+            end
+        end
+        if (not inserted) then
+            table.insert(self._handTiles[actorSeat], mt);
+        end
+        paver:CreateFetchTile(clientSeat, mt, true);
+    elseif (action.type == mah_def.MahjongAction.Play) then
+        --print("ClientSeat: " .. tostring(clientSeat) .. ", play tile id: " .. tostring(action.tile));
+        mt = mah_gen.TileFromID(action.tile);
+        self.RemoveTileByID(self._handTiles[actorSeat], action.tile);
+        self._room:OnPlayTile1(clientSeat, mt, self._handTiles[actorSeat]);
+    elseif (action.type == mah_def.MahjongAction.Chi or action.type == mah_def.MahjongAction.Peng) then
+        --print("ClientSeat: " .. tostring(clientSeat)  .. ", chi or peng");
+        local chapters = self._playbackData.chapters[actorSeat];
+        local mc = nil;
+        nums = #(chapters);
+        for j = 1, nums do
+            if (self.ChapterHasAction(chapters[j], self._action - 1)) then
+                mc = chapters[j];
+                break;
+            end
+        end
+        if (mc ~= nil) then
+            local pengOrChi = true;
+            local chapter = {};
+            chapter.types = {};
+            chapter.tiles = {};
+            if (action.type == mah_def.MahjongAction.Chi) then
+                pengOrChi = false;
+                table.insert(chapter.types, mah_def.MahjongChapter.Chi);
+            else
+                table.insert(chapter.types, mah_def.MahjongChapter.Peng);
+            end
+            for j = 1, 3 do
+                local tmpTile = {};
+		        tmpTile.tile = mc.tiles[j].tile;
+		        tmpTile.id = mc.tiles[j].id;
+                table.insert(chapter.tiles, tmpTile);
+                self.RemoveTileByID(self._handTiles[actorSeat], mc.tiles[j].id);
+            end
+            chapter.targetPlayer = mc.targetPlayer;
+            local clientSeat2 = self._room:Server2ClientSeat(mc.targetPlayer);
+            self._room:OnPengChiTile1(pengOrChi, clientSeat, clientSeat2, chapter, self._handTiles[actorSeat]);
+        end
+    elseif (action.type == mah_def.MahjongAction.ZhiGang or
+            action.type == mah_def.MahjongAction.JiaGang or
+            action.type == mah_def.MahjongAction.AnGang) then
+        local chapters = self._playbackData.chapters[actorSeat];
+        local mc = nil;
+        nums = #(chapters);
+        for j = 1, nums do
+            if (self.ChapterHasAction(chapters[j], self._action - 1)) then
+                mc = chapters[j];
+                break;
+            end
+        end
+        if (mc ~= nil) then
+            local chapterType = 0;
+            local tmpChapters = {};
+            for i, v in ipairs(chapters) do
+                chapterType = self.GetChapterType(v, self._action - 1);
+                if (chapterType ~= mah_def.MahjongChapter.Invalid) then
+                    table.insert(tmpChapters, self.ChapterBefore(v, self._action - 1));
+                end
+            end
+            self.RemoveTiles(self._handTiles[actorSeat], mc.tiles);
+            local clientSeat2 = self._room:Server2ClientSeat(mc.targetPlayer);
+            chapterType = paver.GetChapterType(mc);
+            self._room:OnGangTile1(chapterType, clientSeat, clientSeat2, tmpChapters, self._handTiles[actorSeat]);
+        end
+    elseif (action.type == mah_def.MahjongAction.DianPao or
+            action.type == mah_def.MahjongAction.ZiMo) then
+        toEnd = true;
+        local msg = {};
+        msg.players = {};
+        msg.players[1] = actor.player;
+        msg.players[2] = -1;
+        msg.players[3] = -1;
+        nums = 0;
+        if (action.type == mah_def.MahjongAction.DianPao) then
+            --查看是否一炮多响
+            for i = 1, 2 do
+                if (self._action == #actions) then
+                    break;
+                end
+                local actionNext = actions[self._action + 1];
+                if (actionNext ~= mah_def.MahjongAction.DianPao) then
+                    break;
+                end
+                local actorNext = actors[actionNext.slot + 1];
+                if (actor.player ~= actorNext.player) then
+                    if (nums == 0) then
+                        msg.players[2] = actorNext.player;
+                    else
+                        msg.players[3] = actorNext.player;
+                    end
+                    nums = nums + 1;
+                end
+                self._action = self._action + 1;
+            end
+            local actionPrev = actions[self._action - 1];
+            local actorPrev = actors[actionPrev.slot + 1];
+            msg.actor = actorPrev.player;
+            msg.ziMo = false;
+        else
+            msg.ziMo = true;
+            msg.actor = actor.player;
+        end
+        self._room:OnHuTile1(msg);
+        self._room:OnSettlement1(self._playbackData.settlement, self._playbackData.winGolds, self._nicknames, false, true);
+    end
+    local percent = 1.0;
+    if (toEnd) then
+        self._action = #actions + 1;
+    else
+        self._action = self._action + 1;
+        percent = (self._action - 1) / #actions;
+    end
+    if (self._textPercent ~= nil) then
+        percent = percent * 100.0;
+        CS.NiuMa.LuaUGUI.SetText(self._textPercent, CS.System.String.Format("{0:0.#}%", percent));
+    end
+end
+
+--从牌数组1中删除牌数组2中的所有牌
+function _module.RemoveTiles(tiles1, tiles2)
+    if (tiles1 == nil or tiles2 == nil) then
+        return ;
+    end
+    for i = 1, #(tiles2) do
+        _module.RemoveTileByID(tiles1, tiles2[i].id);
+    end
+end
+
+--从牌数组中删除指定ID的牌
+function _module.RemoveTileByID(tiles, id)
+    if (tiles == nil) then
+        return false;
+    end
+    for i = 1, #tiles do
+        if (tiles[i].id == id) then
+            table.remove(tiles, i);
+            return true;
+        end
+    end
+    print("remove tile failed, can't find the tile with id: " .. tostring(id));
+    return false;
+end
+
+--判定传入的牌章是否包含传入的动作索引
+function _module.ChapterHasAction(chapter, action)
+    if (chapter == nil) then
+        return false;
+    end
+    local nums = #(chapter.actionIds);
+    for i = 1, nums do
+        if (chapter.actionIds[i] == action) then
+            return true;
+        end
+    end
+    return false;
+end
+
+--获取牌章在action之前最早的类型
+function _module.GetChapterType(chapter, action)
+    local chapterType = mah_def.MahjongChapter.Invalid;
+    if (chapter == nil) then
+        return chapterType;
+    end
+    for i = 1, 3 do
+        if (action >= chapter.actionIds[i]) then
+            chapterType = chapter.types[i];
+            break;
+        end
+    end
+    return chapterType;
+end
+
+function _module.ChapterBefore(chapter, action)
+    if (chapter == nil) then
+        return;
+    end
+    local chapterType = mah_def.MahjongChapter.Invalid;
+    local ret = {};
+    local nums = 1;
+    ret.types = {};
+    ret.actionIds = {};
+    ret.tiles = {};
+    for i = 1, 3 do
+        if ((chapter.types[i] == mah_def.MahjongChapter.Invalid) or
+            chapter.actionIds[i] > action) then
+            break;
+        end
+        chapterType = chapter.types[i];
+        table.insert(ret.types, chapterType);
+        table.insert(ret.actionIds, chapter.actionIds[i]);
+        nums = nums + 1;
+    end
+    for i = nums, 3 do
+        table.insert(ret.types, mah_def.MahjongChapter.Invalid);
+        table.insert(ret.actionIds, 0);
+    end
+    if (chapterType == mah_def.MahjongChapter.Chi or
+        chapterType == mah_def.MahjongChapter.Peng) then
+        nums = 3;
+    else
+        nums = 4;
+    end
+    for i = 1, nums do
+        local mt = {};
+        mt.tile = chapter.tiles[i].tile;
+        mt.id = chapter.tiles[i].id;
+        table.insert(ret.tiles, mt);
+    end
+    ret.targetPlayer = chapter.targetPlayer;
+    ret.targetTile = chapter.targetTile;
+    return ret;
+end
+
+return _module;

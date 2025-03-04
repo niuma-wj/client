@@ -1,0 +1,78 @@
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child = obj.transform:Find("InputID");
+    if (child ~= nil) then
+        self._inputID = child.gameObject;
+    end
+    child = obj.transform:Find("BtnOk");
+    if (child ~= nil) then
+        CS.NiuMa.LuaUGUI.AddBtnClick(child.gameObject, self.OnOkClick);
+    end
+    self._level = nil;
+    self._adding = false;
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:IsVisible()
+    return self.gameObject.activeSelf;
+end
+
+function _module:SetLevel(lvl)
+	self._level = lvl;
+end
+
+function _module.OnOkClick()
+    local self = _module;
+    if (self._adding) then
+        return;
+    end
+	if (self._level == nil) then
+		return;
+	end
+    local gm = CS.NiuMa.GameManager.Instance;
+	if (self._level >= 3) then
+		gm:ShowPromptTip("3级代理不能再设置下级代理", 2.0);
+		return;
+	end
+    local ui = CS.NiuMa.LuaUGUI;
+    local playerId = "";
+    if (self._inputID ~= nil) then
+        playerId = ui.GetInputText(self._inputID);
+    end
+	if (playerId == nil or #playerId == 0) then
+        gm:ShowPromptTip("请输入下级代理id", 2.0);
+		return;
+	end
+    local t = {};
+    t.playerId = playerId;
+    local body = rapidjson.encode(t);
+    gm:AuthPost("/player/agency/add/junior", body, self.OnAddRespone);
+    self._adding = true;
+end
+
+function _module.OnAddRespone(code, text)
+    local self = _module;
+    self._adding = false;
+    local gm = CS.NiuMa.GameManager.Instance;
+    if (code == 200) then
+        gm:ShowPromptTip("添加下级代理成功", 2.0);
+    else
+        local t = rapidjson.decode(text);
+        local msg = t.msg;
+        if (msg == nil or #msg == 0) then
+            msg = text;
+        end
+        msg = "添加下级代理失败：" .. msg;
+        gm:ShowPromptTip(msg, 3.0);
+    end
+end
+
+return _module;

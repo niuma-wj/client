@@ -1,0 +1,4 @@
+{
+  "httpHost": "http://192.168.6.220:18080",
+  "assetBundleHost": "http://192.168.6.220:6868/asset-bundle/"
+}

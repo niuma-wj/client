@@ -1,0 +1,143 @@
+-- 描述：逮狗腿牌局结算玩家得分
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.02.05
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Frame");
+    if (child ~= nil) then
+        self._frame = child.gameObject;
+    end
+    child = obj.transform:Find("HeadTexture");
+    if (child ~= nil) then
+        self._headTexture = child.gameObject;
+    end
+    child = obj.transform:Find("Banker");
+    if (child ~= nil) then
+        self._banker = child.gameObject;
+    end
+    child = obj.transform:Find("Lackey");
+    if (child ~= nil) then
+        self._lackey = child.gameObject;
+    end
+    child = obj.transform:Find("ShowCard");
+    if (child ~= nil) then
+        self._showCard = child.gameObject;
+    end
+    child = obj.transform:Find("First");
+    if (child ~= nil) then
+        self._first = child.gameObject;
+    end
+	child = obj.transform:Find("Bankrupt");
+    if (child ~= nil) then
+        self._bankrupt = child.gameObject;
+    end
+    child = obj.transform:Find("TextName");
+    if (child ~= nil) then
+        self._textName = child.gameObject;
+    end
+    child = obj.transform:Find("TextXiQian");
+    if (child ~= nil) then
+        self._textXiQian = child.gameObject;
+    end
+    child = obj.transform:Find("TextScore");
+    if (child ~= nil) then
+        self._textScore = child.gameObject;
+    end
+    child = obj.transform:Find("TextGold");
+    if (child ~= nil) then
+        self._textGold = child.gameObject;
+    end
+end
+
+function _module:Start()
+end
+
+function _module:SetHeadTexture(tex)
+	if (self._headTexture ~= nil) then
+		CS.NiuMa.LuaUGUI.SetTexture(self._headTexture, tex);
+	end
+end
+
+function _module:SetName(name)
+    if (self._textName ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textName, name);
+	end
+end
+
+function _module:SetMySellf(s)
+    if (self._frame ~= nil) then
+        self._frame:SetActive(s);
+    end
+end
+
+function _module:SetBanker(s)
+	if (self._banker ~= nil) then
+		self._banker:SetActive(s);
+	end
+end
+
+function _module:SetLackey(s)
+	if (self._lackey ~= nil) then
+		self._lackey:SetActive(s);
+	end
+end
+
+function _module:SetCamp(c)
+    local sel = self.gameObject:GetComponent("ImageSelector");
+    if (sel ~= nil) then
+        if (c) then
+            sel:SetSprite(1);
+        else
+            sel:SetSprite(0);
+        end
+    end
+end
+
+function _module:SetShowCard(s)
+    if (self._showCard ~= nil) then
+		self._showCard:SetActive(s);
+	end
+end
+
+function _module:SetFirst(s)
+    if (self._first ~= nil) then
+		self._first:SetActive(s);
+	end
+end
+
+function _module:SetBankrupt(s)
+    if (self._bankrupt ~= nil) then
+		self._bankrupt:SetActive(s);
+	end
+end
+
+function _module:SetXiQian(xiQian)
+    if (self._textXiQian ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textXiQian, tostring(xiQian));
+	end
+end
+
+function _module:SetScore(score)
+    if (self._textScore ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textScore, tostring(score));
+	end
+end
+
+function _module:SetWinGold(gold)
+    if (self._textGold ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._textGold, tostring(gold));
+	end
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;
