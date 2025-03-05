@@ -27,7 +27,7 @@ AssetBundle包全部文件如下图所示：\
 客户端支持调试模式，以便在打包之后(例如安卓和IOS端)可以在屏幕上打印Debug.Log(以及Lua的print函数)的输出内容，方便在手机上排查错误，开起调试的代码设置如下图：\
 ![debug](https://gitee.com/friedrich-hegel/data/raw/master/debug.png)\
 开启调试模式之后的输出效果：\
-![debug](https://gitee.com/friedrich-hegel/data/raw/master/debug.png)
+![debug](https://gitee.com/friedrich-hegel/data/raw/master/debug1.png)
 
 # 测试客户端
 [下载地址](http://106.13.15.226:8896/download)
