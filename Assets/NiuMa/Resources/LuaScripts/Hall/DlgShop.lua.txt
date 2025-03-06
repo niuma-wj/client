@@ -61,12 +61,11 @@ function _module.OnBuyClick(idx)
     if (self._buying) then
         return;
     end
-    local diamonds = { 20, 50, 100, 200, 300, 500 };
-    local golds = { 100, 240, 460, 880, 1260, 2000 };
+    local diamonds = { 50, 100, 200, 300, 400, 500 };
+    local golds = { 1250, 2400, 4600, 6600, 8400, 10000 };
     local text = "确定购买" .. tostring(diamonds[idx]) .. "枚钻石吗？将花费" .. tostring(golds[idx]) .. "金币。";
     self._index = idx;
     CS.NiuMa.GameManager.Instance:ShowPromptDialog(text, self.DoBuy);
-    self._buying = true;
 end
 
 function _module.DoBuy()
@@ -76,6 +75,7 @@ function _module.DoBuy()
     end
     local path = "/player/capital/diamond/buy/" .. tostring(self._index);
     CS.NiuMa.GameManager.Instance:AuthGet(path, self.OnBuyResponse);
+    self._buying = true;
 end
 
 function _module.OnBuyResponse(code, text)
