@@ -1,39 +1,41 @@
-# Unity版本要求
-本项目最低支持的Unity版本为2022.3.12f1版本，因为依赖的MessagePack-CSharp库需要该版本以上才能通过C#源码生成器以支持IL2CPP，若不打IL2CPP(即是用MONO)则无此要求，不过通常建议打IL2CPP包，以便获得更好的性能并同时支持ARM32和ARM64。具体请查看：
+**Read this in other languages: [English](README.MD), [中文](README_ZH.MD).**
+
+# Unity version requirement
+Due to the using of MessagePack-CSharp library which is a message serialization solution, the minimum supported Unity version is 2022.3.12f1, as it is necessary to support IL2CPP via C# Source Generator. There's no such requirement if you don't build the client of IL2CPP version (that is building Mono version), But the IL2CPP version is recommended, for it can support both ARM32 and ARM64, and will have a better performance. Here is the Github address of the MessagePack-CSharp library.\
 [MessagePack-CSharp](https://github.com/MessagePack-CSharp/MessagePack-CSharp#unity-support)
 
-# 热更新方案
-本项目使用腾讯开源的xLua热更新方案，在此感谢xLua开源项目开发者的无私奉献。
-xLua开源项目地址：
+# Dynamic update solution
+We use the open source project xLua which is developed by Tencent as the dynamic update solution for this client, thank you to the developers of the xLua open source project for their dedication. Here is the Github address of the xLua project.\
 [xLua](https://github.com/Tencent/xLua)
 
-# AssetBundle打包
-使用如下图所示菜单打包资源和脚本\
+# AssetBundle package
+Here is the command menu for packaging game resources and Lua scripts.\
 ![assetbundle](https://gitee.com/friedrich-hegel/data/raw/master/ab.png)\
-AssetBundle包全部文件如下图所示：\
+All the asset-bundle files are shown in the following picture.\
 ![assetbundle](https://gitee.com/friedrich-hegel/data/raw/master/ab-list.png)\
-其中MainManifest.xml文件为客户端主界面依赖的AssetBundle包清单，GameManifest.xml文件为客户端中各游戏依赖的AssetBundle包清单，Dependencies.xml文件为AssetBundle包之间的依赖关系，Dependencies.xml文件在打资源包时自动生成和更新(打LUA脚本包不会更新该文件)，其他两个xml则需要手动编辑。特别注意，这三个文件都需要保存为UTF8编码格式，否则客户端无法正常读取文件内容，所以每次打资源包之后需要手动将Dependencies.xml保存为UTF8编码格式，例如在Windows下可以用记事本打开另存为并选择UTF8编码。\
-客户端主界面以及各个游戏的依赖AssetBundle包可以单独更新，这样使得在更新客户端时可以最小化下载依赖文件，如下图所示：\
+The MainManifest.xml file is the manifest of the dependent asset-bundle files of this client's login and main interface, all the dependent asset-bundle files of each game in this client are listed in the GameManifest.xml file, the dependencies between all asset-bundle files are listed in the Dependencies.xml file. When packaging game resources the Dependencies.xml file will be generated and updated automatically, the Dependencies.xml file will not change when packaging Lua scripts, the other two xml files need to be edited manually. In particular, these three xml files need to be saved as UTF8 encoding format, otherwise the client cannot read the file content normally, so after the Dependencies.xml file is modified by the packaging program, you need to save it as UTF8 encoding format manually, for example, under Windows, you can use Notepad to open it then save as and select UTF8 encoding.\
+The asset-bundle files listed in MainManifest.xml and Dependencies.xml can be downloaded independently, this minimizes the download of dependent files when updating the client, as shown in the following pictures.\
 ![load](https://gitee.com/friedrich-hegel/data/raw/master/load.png)\
 ![hall](https://gitee.com/friedrich-hegel/data/raw/master/hall.png)
 
-# 启动配置
-客户端启动时首先需要加载一个名称为config.json的文件，该文件配置了后端HTTP接口地址，以及AssetBundle加载地址，文件内容如下图所示：\
+# Startup Configuration
+When the client startup, it will load a configuration file named "config.json", this file configures the host of the web server and the host of the asset-bundle file server, the content in this configuration file is shown in the following picture.\
 ![config](https://gitee.com/friedrich-hegel/data/raw/master/config.png)\
-在Load.cs代码中修改config.json的下载url地址，该url是写死在代码中的，当需要访问不同的后端地址时，仅需要重新配置config.json并替换该文件，而不需要重新打包客户端，如下图。\
+The download url for config.json is specified in the source code file Load.cs, which is hard coded in the source file, when the back-end servers are migrated, we can just update the config.json file, and we don't need to repack and republish the client. \
 ![config1](https://gitee.com/friedrich-hegel/data/raw/master/config1.png)
 
-# Debug模式
-客户端支持调试模式，以便在打包之后(例如安卓和IOS端)可以在屏幕上打印Debug.Log(以及Lua的print函数)的输出内容，方便在手机上排查错误，开起调试的代码设置如下图：\
+# Debug Mode
+The client supports debug mode, so that after packaging (such as Android and IOS) you can print the output of the Unity function "Debug.log" (or Lua's "print" function) on the screen, which is convenient for debuging errors on the phone. The debug-mode setting code are as follows.\
 ![debug](https://gitee.com/friedrich-hegel/data/raw/master/debug.png)\
-开启调试模式之后的输出效果：\
+The output effect after debug-mode is enabled.\
 ![debug](https://gitee.com/friedrich-hegel/data/raw/master/debug1.png)
 
-# 测试客户端
-[下载地址](http://106.13.15.226:8896/download)
+# Testing client
+A testing client is available on the Internet, every one is welcomed to download and test it.\
+[client](http://106.13.15.226:8896/download)
 
-# 说明
-代码仓库中的密钥文件(Assets/Resources/user.keystore)的密码为：123456，该文件在打安卓包时需要用到
+# Note
+The password of the key store file (Assets/Resources/user.keystore) in this project is "123456", the key store file is needed when building android client.
 
-# 联系方式
+# Contact
 393817707@qq.com
