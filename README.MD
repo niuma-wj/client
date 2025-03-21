@@ -32,6 +32,7 @@ AssetBundle包全部文件如下图所示：\
 ![debug](https://gitee.com/friedrich-hegel/data/raw/master/debug1.png)
 
 # 测试客户端
+项目当前部署了公网上的测试客户端，欢迎下载测试:\
 [下载地址](http://106.13.15.226:8896/download)
 
 # 说明
