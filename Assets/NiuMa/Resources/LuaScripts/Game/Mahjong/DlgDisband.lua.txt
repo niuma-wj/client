@@ -91,7 +91,7 @@ function _module.SendDisbandChoose(choice)
     msg.venueId = gm.VenueId;
     msg.choice = choice;
     local json = rapidjson.encode(msg);
-    nm:SendMessage("MsgMahjongDisbandChoose", json, true);
+    nm:SendMessage("MsgDisbandChoose", json, true);
 end
 
 -- mySeat为本机玩家在服务器的座位号
