@@ -80,21 +80,21 @@ function _module:IsVisible()
 end
 
 function _module.OnAgreeClick()
-    --[[
-    local msg = bd_pb.NetMsgInt();
-	msg.Val = 1;
-	local pb_data = msg:SerializeToString();
-    LuaGameUtilities.SendTableMessage("PT_DISBAND_CHOICE", "NetMsgInt", pb_data);
-    --]]
+    _module.SendDisbandChoose(1);
 end
 
 function _module.OnRefuseClick()
-    --[[
-    local msg = bd_pb.NetMsgInt();
-	msg.Val = 2;
-	local pb_data = msg:SerializeToString();
-    LuaGameUtilities.SendTableMessage("PT_DISBAND_CHOICE", "NetMsgInt", pb_data);
-    --]]
+    _module.SendDisbandChoose(2);
+end
+
+function _module.SendDisbandChoose(choice)
+    local gm = CS.NiuMa.GameManager.Instance;
+    local nm = CS.NiuMa.NetworkManager.Instance;
+    local msg = {};
+    msg.venueId = gm.VenueId;
+    msg.choice = choice;
+    local json = rapidjson.encode(msg);
+    nm:SendMessage("MsgDisbandChoose", json, true);
 end
 
 -- mySeat为本机玩家在服务器的座位号
