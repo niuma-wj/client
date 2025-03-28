@@ -9,6 +9,9 @@
 xLua开源项目地址：
 [xLua](https://github.com/Tencent/xLua)
 
+# 游戏打包
+打包游戏前需要先把Assets/NiuMa/Resources文件夹以及Assets/NiuMa/Resources.meta文件临时移出工程，因为Assets/NiuMa/Resources文件夹内的所有资源都以asset bundle的方式加载，游戏打包完成后再将这两者移回原位置。
+
 # AssetBundle打包
 使用如下图所示菜单打包资源和脚本\
 ![assetbundle](https://gitee.com/friedrich-hegel/data/raw/master/ab.png)\

@@ -8,6 +8,9 @@ Due to the using of MessagePack-CSharp library which is a message serialization 
 We use the open source project xLua which is developed by Tencent as the dynamic update solution for this client, thank you to the developers of the xLua open source project for their dedication. Here is the Github address of the xLua project.\
 [xLua](https://github.com/Tencent/xLua)
 
+# Game packaging
+Before packaging the game application, the "Assets/NiuMa/Resources" folder and the "Assets/NiuMa/Resources.Meta" file need to temporarily removed out of the project, Because all the assets in the "Assets/NiuMa/Resources" folder are loaded in asset bundles, the folder and the file should be moved back to their original location after the game application is packaged.
+
 # AssetBundle package
 Here is the command menu for packaging game resources and Lua scripts.\
 ![assetbundle](https://gitee.com/friedrich-hegel/data/raw/master/ab.png)\
