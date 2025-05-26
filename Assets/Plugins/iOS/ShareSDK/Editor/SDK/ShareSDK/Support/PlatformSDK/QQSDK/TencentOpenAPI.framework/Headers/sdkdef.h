@@ -21,29 +21,6 @@ typedef enum {
 } TCOLogLevel;
 
 /**
- * \brief 手机qq的当前版本
- */
-typedef enum QQVersion
-{
-    kQQUninstall,
-    kQQVersion3_0,
-    kQQVersion4_0,      //支持sso登陆
-    kQQVersion4_2_1,    //ios7兼容
-    kQQVersion4_5,      //4.5版本，wpa会话
-    kQQVersion4_6,      //4.6版本，sso登陆信令通道切换
-    kQQVersion4_7,      //4.7版本 不确定新支持了什么样的属性
-} QQVersion;
-
-
-/**
- * \breif TIM的当前版本
- */
-typedef enum TIMVersion {
-    kTIMUinstall,
-    kTIMVersion1_1,
-}TIMVersion;
-
-/**
  * \breif 授权/分享 方式
  */
 typedef enum TencentAuthShareType {
@@ -80,7 +57,7 @@ typedef enum
  *
  * APIResponse用于封装所有请求的返回结果，包括错误码、错误信息、原始返回数据以及返回数据的json格式字典
  */
-@interface APIResponse : NSObject<NSCoding> {
+@interface APIResponse : NSObject<NSSecureCoding> {
     int      _detailRetCode;
 	int		 _retCode;
 	int		 _seq;
@@ -110,23 +87,23 @@ typedef enum
 /**
  * 错误提示语
  */
-@property (nonatomic, retain) NSString *errorMsg;
+@property (nonatomic, copy) NSString *errorMsg;
 
 /**
  * 服务器返回数据的json格式字典\n
  * 字典内具体参数的命名和含义请参考\ref api_spec
  */
-@property (nonatomic, retain) NSDictionary *jsonResponse;
+@property (nonatomic, copy) NSDictionary *jsonResponse;
 
 /**
  * 服务器返回的原始数据字符串
  */
-@property (nonatomic, retain) NSString *message;
+@property (nonatomic, copy) NSString *message;
 
 /**
  * 用户保留数据
  */
-@property (nonatomic, retain) id userData;
+@property (nonatomic, strong) id userData;
 
 @end
 
@@ -271,6 +248,9 @@ FOUNDATION_EXTERN NSString * const TCOpenSDKErrorMsgWebPage;
 /** 设置头像图片过大 */
 FOUNDATION_EXTERN NSString * const TCOpenSDKErrorMsgUserHeadPicLarge;
 
+/** 用户未同意授权隐私协议 */
+FOUNDATION_EXPORT NSString * const TCOpenSDKErrorMsgUserNotAgreedAuthorization;
+
 ///@}
 
 /**
@@ -333,9 +313,6 @@ typedef enum
 /** 发表一条说说到QQ空间(<b>需要申请权限</b>) */
 FOUNDATION_EXTERN NSString *const kOPEN_PERMISSION_ADD_TOPIC;
 
-/** 发表一篇日志到QQ空间(<b>需要申请权限</b>) */
-FOUNDATION_EXTERN NSString *const kOPEN_PERMISSION_ADD_ONE_BLOG;
-
 /** 创建一个QQ空间相册(<b>需要申请权限</b>) */
 FOUNDATION_EXTERN NSString *const kOPEN_PERMISSION_ADD_ALBUM;
 
@@ -344,9 +321,6 @@ FOUNDATION_EXTERN NSString *const kOPEN_PERMISSION_UPLOAD_PIC;
 
 /** 获取用户QQ空间相册列表(<b>需要申请权限</b>) */
 FOUNDATION_EXTERN NSString *const kOPEN_PERMISSION_LIST_ALBUM;
-
-/** 同步分享到QQ空间、腾讯微博 */
-FOUNDATION_EXTERN NSString *const kOPEN_PERMISSION_ADD_SHARE;
 
 /** 验证是否认证空间粉丝 */
 FOUNDATION_EXTERN NSString *const kOPEN_PERMISSION_CHECK_PAGE_FANS;
@@ -368,6 +342,9 @@ FOUNDATION_EXTERN NSString *const kOPEN_PERMISSION_GET_USER_INFO;
 
 /** 移动端获取用户信息 */
 FOUNDATION_EXTERN NSString *const kOPEN_PERMISSION_GET_SIMPLE_USER_INFO;
+
+/** 移动端获取用户信息 */
+FOUNDATION_EXTERN NSString *const kOPEN_PERMISSION_ALL;
 ///@}
 
 
@@ -375,8 +352,33 @@ FOUNDATION_EXTERN NSString *const kOPEN_PERMISSION_GET_SIMPLE_USER_INFO;
  * \name CGI接口相关参数类型定义
  */
 
+/** 必填的字符串类型参数 */
+typedef NSString *TCRequiredStr;
+
+/** 必填的UIImage类型参数 */
+typedef UIImage *TCRequiredImage;
+
+/** 必填的整型参数 */
+typedef NSInteger TCRequiredInt;
+
+/** 必填的数字类型 */
+typedef NSNumber *TCRequiredNumber;
+
+/** 必填的NSData参数 */
+typedef NSData *TCRequiredData;
+
 /** 可选的字符串类型参数 */
 typedef NSString *TCOptionalStr;
+
+/** 可选的UIImage类型参数 */
+typedef UIImage *TCOptionalImage;
+
+/** 可选的整型参数 */
+typedef NSInteger TCOptionalInt;
+
+/** 可选的数字类型 */
+typedef NSNumber *TCOptionalNumber;
+
 /** 可选的不定类型参数 */
 typedef id TCRequiredId;
 ///@}
@@ -398,7 +400,7 @@ typedef id TCRequiredId;
 /**
  * API参数中的保留字段，可以塞入任意字典支持的类型，再调用完成后会带回给调用方
  */
-@property (nonatomic, retain) TCRequiredId paramUserData;
+@property (nonatomic, strong) TCRequiredId paramUserData;
 
 /**
  * APIResponse,API的返回结果

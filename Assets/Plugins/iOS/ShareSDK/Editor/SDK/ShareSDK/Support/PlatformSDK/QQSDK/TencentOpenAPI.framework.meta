@@ -1,32 +1,17 @@
 fileFormatVersion: 2
-guid: 78f27ed79b4c84ed6beb716c9938f665
+guid: e3ebbde4fdf6d495f880e7ea6a025f9d
 folderAsset: yes
-timeCreated: 1503646081
-licenseType: Free
 PluginImporter:
   externalObjects: {}
   serializedVersion: 2
   iconMap: {}
   executionOrder: {}
+  defineConstraints: []
   isPreloaded: 0
   isOverridable: 0
+  isExplicitlyReferenced: 0
+  validateReferences: 1
   platformData:
-  - first:
-      '': Any
-    second:
-      enabled: 0
-      settings:
-        Exclude Android: 1
-        Exclude Editor: 1
-        Exclude Linux: 1
-        Exclude Linux64: 1
-        Exclude LinuxUniversal: 1
-        Exclude OSXIntel: 1
-        Exclude OSXIntel64: 1
-        Exclude OSXUniversal: 1
-        Exclude Win: 1
-        Exclude Win64: 1
-        Exclude iOS: 1
   - first:
       Any: 
     second:
@@ -35,7 +20,7 @@ PluginImporter:
   - first:
       Editor: Editor
     second:
-      enabled: 0
+      enabled: 1
       settings:
         DefaultValueInitialized: true
   userData: 

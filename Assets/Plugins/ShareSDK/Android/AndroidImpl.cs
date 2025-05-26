@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Collections;
 using UnityEngine; 
 
 namespace cn.sharesdk.unity3d
 {
-	#if UNITY_ANDROID
+#if UNITY_ANDROID
 	public class AndroidImpl : ShareSDKImpl
 	{
 		private AndroidJavaObject ssdk;
@@ -36,6 +36,24 @@ namespace cn.sharesdk.unity3d
 				ssdk.Call("initSDK", appKey,appSecret);
 			}
 		}
+
+        public override void PrepareLoopShare()
+        {
+            Debug.Log("AndroidImpl  ===>>>  PrepareLoopShare ");
+            if (ssdk != null) 
+			{			
+				ssdk.Call("prepareLoopShare");
+			}
+        }
+
+        public override void setChannelId() 
+        {
+            Debug.Log("AndroidImpl  ===>>>  SetChannelId ");
+            if (ssdk != null) 
+			{			
+				ssdk.Call("setChannelId");
+			}
+        }
 
 		public override void SetPlatformConfig (Hashtable configs) 
 		{
@@ -160,22 +178,66 @@ namespace cn.sharesdk.unity3d
 				ssdk.Call("disableSSOWhenAuthorize", disable);
 			}
 		}
+		
+		public override void setDisappearShareToast (Boolean isShow)
+		{
+			Debug.Log("AndroidImpl  ===>>>  setDisappearShareToast" );
+			if (ssdk != null)
+			{
+				ssdk.Call("setDisappearShareToast", isShow);
+			}
+		}
+		
 
 		public override void ShareWithContentName (int reqId, PlatformType platform, string contentName, Hashtable customFields)
 		{
-			Debug.Log("#WARING : Do not support this feature in Android temporarily" );
+			Debug.Log("#WARING : Do not support this feature in Android " );
 		}
 		
 		public override void ShowPlatformListWithContentName (int reqId, string contentName, Hashtable customFields, PlatformType[] platforms, int x, int y)
 		{
-			Debug.Log("#WARING : Do not support this feature in Android temporarily" );
+			Debug.Log("#WARING : Do not support this feature in Android " );
 		}
 
 		public override void ShowShareContentEditorWithContentName (int reqId, PlatformType platform, string contentName, Hashtable customFields)
 		{
-			Debug.Log("#WARING : Do not support this feature in Android temporarily" );
+			Debug.Log("#WARING : Do not support this feature in Android " );
 		}
 
+		public override bool openMiniProgram (String userName, String path, int miniProgramType)
+		{
+			// wait for implementation
+			return false;
+		}
+		
+		public override void getWXRequestToken()
+		{
+			Debug.Log("#WARING : Do not support this feature in Android" );
+		}
+		
+		public override void getWXRefreshToken()
+		{
+			Debug.Log("#WARING : Do not support this feature in Android" );
+		}
+		
+		public override void sendWXRefreshToken(String token)
+		{
+			Debug.Log("#WARING : Do not support this feature in Android" );
+		}
+		
+		public override void sendWXRequestToken(String uid, String token)
+		{
+			Debug.Log("#WARING : Do not support this feature in Android" );
+		}
+
+		public override void isClientValidForAndroid(int reqID,PlatformType platform)
+		{
+			Debug.Log("AndroidImpl  ===>>>  isClientValidForAndroid" );
+			if (ssdk != null)
+			{
+				ssdk.Call("isClientValidForAndroid",  reqID, (int)platform);
+			}
+		}
 	}
-	#endif
+#endif
 }
