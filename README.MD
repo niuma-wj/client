@@ -7,7 +7,9 @@
 # 热更新方案
 本项目使用腾讯开源的xLua热更新方案，在此感谢xLua开源项目开发者的无私奉献。
 xLua开源项目地址：
-[xLua](https://github.com/Tencent/xLua)
+[xLua](https://github.com/Tencent/xLua)\
+游戏打包之前需要手动生成xLua相关的C#代码，如下图所示：\
+![xLua](https://gitee.com/friedrich-hegel/data/raw/master/xlua.png)\
 
 # 游戏打包
 打包游戏前需要先把Assets/NiuMa/Resources文件夹以及Assets/NiuMa/Resources.meta文件临时移出工程，因为Assets/NiuMa/Resources文件夹内的所有资源都以asset bundle的方式加载，游戏打包完成后再将这两者移回原位置。
@@ -33,10 +35,6 @@ AssetBundle包全部文件如下图所示：\
 ![debug](https://gitee.com/friedrich-hegel/data/raw/master/debug.png)\
 开启调试模式之后的输出效果：\
 ![debug](https://gitee.com/friedrich-hegel/data/raw/master/debug1.png)
-
-# 测试客户端
-项目当前部署了公网上的测试客户端，欢迎下载测试:\
-[下载地址](http://106.13.15.226:8896/download)
 
 # 说明
 平台当前包含麻将、逮狗腿（斗地主类）、六安比鸡，以及百人牛牛共4款棋牌游戏。\
