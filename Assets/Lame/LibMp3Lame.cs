@@ -680,13 +680,15 @@ namespace NAudio.Lame.DLL
 #if UNITY_EDITOR
 
 #if UNITY_EDITOR_OSX
-            const string libname = @"__Internal";
+            //const string libname = @"__Internal";
+            const string libname = @"lame";
 #else
             const string libname = @"libmp3lame.dll";
 #endif
 
 #elif UNITY_IOS
-            const string libname = @"__Internal";
+            //const string libname = @"__Internal";
+            const string libname = @"libmp3lame";
 #elif UNITY_ANDROID
             const string libname = @"mp3lame";
 #elif UNITY_STANDALONE_WIN //添加Windows平台宏，否则打PC包会报找不到libmp3lame.dll

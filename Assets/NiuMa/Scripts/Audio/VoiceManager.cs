@@ -236,7 +236,10 @@ namespace NiuMa
         IEnumerator LoadAudio(string wavFile, string fileName, int seat)
         {
 #if UNITY_EDITOR
-#elif UNITY_ANDROID
+#if UNITY_EDITOR_OSX
+            wavFile = "file://" + wavFile;
+#endif
+#elif UNITY_IOS || UNITY_ANDROID
             wavFile = "file://" + wavFile;
 #endif
             using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(wavFile, AudioType.WAV))
