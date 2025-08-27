@@ -32,8 +32,8 @@ AssetBundle 包全部文件如下图所示：\
 ![load](https://gitee.com/friedrich-hegel/data/raw/master/load.png)\
 ![hall](https://gitee.com/friedrich-hegel/data/raw/master/hall.png)
 
-[掼蛋截图 1](https://gitee.com/friedrich-hegel/data/raw/master/guandan1.jpg)
-[掼蛋截图 2](https://gitee.com/friedrich-hegel/data/raw/master/guandan2.jpg)
+![掼蛋截图 1](https://gitee.com/friedrich-hegel/data/raw/master/guandan1.jpg)\
+![掼蛋截图 2](https://gitee.com/friedrich-hegel/data/raw/master/guandan2.jpg)
 
 # 启动配置
 
