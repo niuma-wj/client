@@ -80,7 +80,7 @@ public class VoiceRecorder : MonoBehaviour, RecorderListener, IPointerDownHandle
             GameManager.Instance.ShowPromptTip("请等待当前录音结束，不要快速点击录音按钮!", 2.0f);
             return;
         }
-        Debug.Log("OnPointerDown");
+        //Debug.Log("OnPointerDown");
         if (_down)
         {
             Debug.Log("录音按钮状态错误!");
@@ -95,7 +95,7 @@ public class VoiceRecorder : MonoBehaviour, RecorderListener, IPointerDownHandle
     // 当按钮抬起的时候自动调用此方法
     public void OnPointerUp(PointerEventData eventData)
     {
-        Debug.Log("OnPointerUp");
+        //Debug.Log("OnPointerUp");
         if (!_down)
             return;
         _down = false;

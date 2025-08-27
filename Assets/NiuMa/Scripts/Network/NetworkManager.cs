@@ -65,6 +65,9 @@ namespace NiuMa
         // 断线后尝试重连次数
         private int _reconnects = 0;
 
+        // 是否已经做网络连接失败提示
+        private bool _prompted = false;
+
         // 心跳计数器
         private int _heartbeat = 0;
 
@@ -401,6 +404,7 @@ namespace NiuMa
             {
                 // 连接成功
                 _reconnects = 0;
+                _prompted = false;
                 GameManager.Instance.ShowConnecting(false);
                 // 向服务器发送玩家连接消息
                 MsgPlayerConnect tmp = new MsgPlayerConnect();
@@ -434,8 +438,11 @@ namespace NiuMa
                 _connection.OnConnectFailed();
                 if (_reconnects > 4)
                 {
-                    GameManager.Instance.ShowConnecting(false);
-                    GameManager.Instance.ShowPromptDialog("网络连接失败，请检查网络设置", GameManager.Instance.DestroyGameRoom);
+                    if (!_prompted) {
+                        _prompted = true;
+                        GameManager.Instance.ShowConnecting(false);
+                        GameManager.Instance.ShowPromptDialog("网络连接失败，请检查网络设置", GameManager.Instance.DestroyGameRoom);
+                    }
                 }
                 else if (!string.IsNullOrEmpty(_venueId))
                 {

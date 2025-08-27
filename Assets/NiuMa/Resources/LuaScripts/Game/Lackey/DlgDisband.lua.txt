@@ -157,6 +157,7 @@ function _module:OnDisbandChoice(seat, mySeat, choice)
         tmp = tmp - 1;
     end
     local ui = CS.NiuMa.LuaUGUI;
+    local Color = CS.UnityEngine.Color;
     if (self._choices[tmp] ~= nil) then
         if (choice == 1) then
             ui.SetText(self._choices[tmp], "同意");

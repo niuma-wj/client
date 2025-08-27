@@ -25,4 +25,26 @@ function _module.IsStringNotEmpty(str)
 	return true;
 end
 
+--判定数组arr中是否包含元素e
+function _module.ArrayContains(arr, e)
+	for i, v in ipairs(arr) do
+		if (v == e) then
+			return true;
+		end
+	end
+	return false;
+end
+
+--计算table(非数组)的元素数量
+function _module.CountTableElements(t)
+	if (t == nil) then
+		return 0;
+	end
+	local cnt = 0;
+	for k, v in pairs(t) do
+		cnt = cnt + 1;
+	end
+	return cnt;
+end
+
 return _module;

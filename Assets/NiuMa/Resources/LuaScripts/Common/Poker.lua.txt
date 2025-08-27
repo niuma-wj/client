@@ -1,7 +1,7 @@
--- ÃèÊö£ºÆË¿ËÊµÓÃ¹¤¾ß½Å±¾
--- ×÷Õß£ºwujian
--- ÓÊÏä£º393817707@qq.com
--- ÈÕÆÚ£º2024.12.28
+-- æè¿°ï¼šæ‰‘å…‹å®žç”¨å·¥å…·è„šæœ¬
+-- ä½œè€…ï¼šwujian
+-- é‚®ç®±ï¼š393817707@qq.com
+-- æ—¥æœŸï¼š2024.12.28
 
 local poker_def = require 'Common.PokerDefines';
 
@@ -28,6 +28,22 @@ function _module.ToInt32(point, suit)
 	local val = util.ShiftLeft(point, 8);
 	val = util.BitwiseOr(val, suit);
 	return val;
+end
+
+function _module.GetPointName(point)
+    if (point > 1 and point < 11) then
+        return tostring(point);
+    end
+    if (point == 1) then
+		return "A";
+    elseif (point == 11) then
+        return "J";
+    elseif (point == 12) then
+        return "Q";
+    elseif (point == 13) then
+        return "K";
+    end
+    return nil;
 end
 
 function _module.PokerPrefab(point, suit)

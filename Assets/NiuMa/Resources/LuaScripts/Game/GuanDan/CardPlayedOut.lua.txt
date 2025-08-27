@@ -1,0 +1,152 @@
+-- CardPlayedOut.lua
+-- 描述：掼蛋已打出的牌布局脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.07.31
+
+local base = require 'BehaviourBase';
+local pok_def = require 'Common.PokerDefines';
+local Vector2 = CS.UnityEngine.Vector2;
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+	self._spriteList = obj:GetComponent("SpriteList");
+	self._bottom = obj.transform:Find("Bottom");
+	self._right = obj.transform:Find("Right");
+	self._top = obj.transform:Find("Top");
+	self._left = obj.transform:Find("Left");
+end
+
+function _module:GetCardParent(clientSeat)
+	local ret = nil;
+	if (clientSeat == 1) then
+		ret = self._bottom;
+	elseif (clientSeat == 2) then
+		ret = self._right;
+	elseif (clientSeat == 3) then
+		ret = self._top;
+	elseif (clientSeat == 4) then
+		ret = self._left;
+	end
+	return ret;
+end
+
+function _module:GetCardArray(clientSeat)
+	local ret = nil;
+	if (clientSeat == 1) then
+		ret = self._bottomCards;
+	elseif (clientSeat == 2) then
+		ret = self._rightCards;
+	elseif (clientSeat == 3) then
+		ret = self._topCards;
+	elseif (clientSeat == 4) then
+		ret = self._leftCards;
+	end
+	return ret;
+end
+
+function _module:SetCardArray(clientSeat, arr)
+	if (clientSeat == 1) then
+		self._bottomCards = arr;
+	elseif (clientSeat == 2) then
+		self._rightCards = arr;
+	elseif (clientSeat == 3) then
+		self._topCards = arr;
+	elseif (clientSeat == 4) then
+		self._leftCards = arr;
+	end
+end
+
+function _module:ClearCards(clientSeat)
+	local arr = self:GetCardArray(clientSeat);
+	if (arr == nil) then
+		return;
+	end
+	for i = 1, #arr do
+		CS.UnityEngine.GameObject.Destroy(arr[i]);
+	end
+	self:SetCardArray(clientSeat, nil);
+end
+
+function _module:Clear()
+	for i = 1, 4 do
+		self:ClearCards(i);
+	end
+end
+
+function _module:GetCardSprite(card)
+	local index = (card.point - pok_def.PokerPoint.Ace) * 4;
+    if (card.point == pok_def.PokerPoint.Joker) then
+        index = index + (card.suit - pok_def.PokerSuit.Little);
+    else
+        index = index + (card.suit - pok_def.PokerSuit.Diamond);
+    end
+	return self._spriteList:GetSprite(index);
+end
+
+function _module:PlayCards(clientSeat, cards)
+	self:ClearCards(clientSeat);
+	if (cards == nil or #cards == 0) then
+		return;
+	end
+	local parent = self:GetCardParent(clientSeat);
+	if (parent == nil) then
+		return;
+	end
+	local rm = CS.NiuMa.ResourceManager.Instance;
+	local prefab = rm:LoadResource("Prefabs/Game/GuanDan/CardPlayedOut", "prefabs/guandan.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (prefab == nil) then
+		return;
+	end
+	local ui = CS.NiuMa.LuaUGUI;
+	local arr = {};
+	local posX = self.GetStartX(#cards);
+	for i = 1, #cards do
+		local cardObj = CS.UnityEngine.GameObject.Instantiate(prefab, parent);
+		if (cardObj ~= nil) then
+			cardObj.name = string.format("Card%02d", i);
+			local trans = cardObj:GetComponent("RectTransform");
+			if (trans ~= nil) then
+				trans.anchoredPosition = Vector2(posX, 0);
+			end
+			posX = posX + 50;
+			ui.SetImage(cardObj, self:GetCardSprite(cards[i])); 
+			table.insert(arr, cardObj);
+		end
+	end
+	self:SetCardArray(clientSeat, arr);
+end
+
+function _module:ShowFlag(clientSeat, flag)
+	self:ClearCards(clientSeat);
+	local parent = self:GetCardParent(clientSeat);
+	if (parent == nil) then
+		return;
+	end
+	local rm = CS.NiuMa.ResourceManager.Instance;
+	local prefab = nil;
+	if (flag == 1) then
+		prefab = rm:LoadResource("Prefabs/Game/GuanDan/SignPass", "prefabs/guandan.ab", "Assets/NiuMa/Resources/", ".prefab");
+	elseif (flag == 2) then
+		prefab = rm:LoadResource("Prefabs/Game/GuanDan/SignResist", "prefabs/guandan.ab", "Assets/NiuMa/Resources/", ".prefab");
+	end
+	if (prefab == nil) then
+		return;
+	end
+	local flagObj = CS.UnityEngine.GameObject.Instantiate(prefab, parent);
+	if (flagObj == nil) then
+		return;
+	end
+	local arr = {};
+	table.insert(arr, flagObj);
+	self:SetCardArray(clientSeat, arr);
+end
+
+function _module.GetStartX(num)
+	local startX = (1 - num) * 25.0;
+	return startX;
+end
+
+return _module;

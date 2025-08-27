@@ -126,6 +126,29 @@ namespace NiuMa
             return target.DOSizeDelta(endValue, duration, snapping);
         }
 
+        public static Tweener DoFade(GameObject obj, float alpha, float duration)
+        {
+            CanvasGroup target = obj.GetComponent<CanvasGroup>();
+            if (target == null)
+                return null;
+            return target.DOFade(alpha, duration);
+        }
+
+        public static Sequence Sequence()
+        {
+            return DOTween.Sequence();
+        }
+
+        public static Sequence Append<T>(Sequence seq, T t) where T : Tween
+        {
+            return seq.Append(t);
+        }
+
+        public static Sequence AppendInterval(Sequence seq, float duration)
+        {
+            return seq.AppendInterval(duration);
+        }
+
         public static T SetEase<T>(T t, Ease ease, float amplitude, float period) where T : Tween
         {
             return t.SetEase(ease, amplitude, period);

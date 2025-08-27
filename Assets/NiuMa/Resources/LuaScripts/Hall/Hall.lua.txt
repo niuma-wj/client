@@ -383,6 +383,8 @@ function _module.OnGameClick(gameName)
 		self:OnBiJiClick();
 	elseif (gameName == "Lackey") then
 		self:OnLackeyClick();
+	elseif (gameName == "GuanDan") then
+		self:OnGuanDanClick();
 	else
 		CS.NiuMa.GameManager.Instance:ShowPromptTip("暂未开放，敬请期待", 2.0);
 	end
@@ -413,6 +415,13 @@ function _module:OnLackeyClick()
 	local obj = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/Lackey/Hall", "prefabs/lackey.ab", "Assets/NiuMa/Resources/", ".prefab");
 	if (obj ~= nil) then
 		CS.NiuMa.GameManager.Instance:CreateHallRoom("Lackey-Hall", obj, true);
+	end
+end
+
+function _module:OnGuanDanClick()
+	local obj = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/GuanDan/Hall", "prefabs/guandan.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (obj ~= nil) then
+		CS.NiuMa.GameManager.Instance:CreateHallRoom("GuanDan-Hall", obj, true);
 	end
 end
 

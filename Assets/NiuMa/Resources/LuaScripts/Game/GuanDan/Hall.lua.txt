@@ -1,0 +1,223 @@
+-- 描述：掼蛋大厅界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.07.15
+
+local base = require 'BehaviourBase';
+local com_def = require 'Common.Defines';
+local DlgJoinRoom = require 'Hall.DlgJoinRoom';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local ui = CS.NiuMa.LuaUGUI;
+	local obj = self.gameObject;
+	local child = obj.transform:Find("DistrictTable/ScrollRect/Viewport/Content");
+	local child1 = nil;
+    if (child ~= nil) then
+		child1 = child:Find("DistrictFriend");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnFriendClick);
+		end
+		child1 = child:Find("DistrictPractice");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnPraticeClick);
+		end
+		child1 = child:Find("DistrictBeginner");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnBeginnerClick);
+		end
+		child1 = child:Find("DistrictModerate");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnModerateClick);
+		end
+		child1 = child:Find("DistrictAdvanced");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnAdvancedClick);
+		end
+		child1 = child:Find("DistrictMaster");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnMasterClick);
+		end
+	end
+	child = obj.transform:Find("BottomBar");
+	if (child ~= nil) then
+		child1 = child:Find("Back/BtnBack");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnBackClick);
+		end
+		child1 = child:Find("More/BtnMore");
+		if (child1 ~= nil) then
+			ui.AddBtnClick(child1.gameObject, self.OnMoreClick);
+		end
+	end
+	child = obj.transform:Find("Friend");
+	if (child ~= nil) then
+		self._friend = child.gameObject;
+		child1 = child:Find("DialogChose");
+		if (child1 ~= nil) then
+			self._dlgChoose = child1.gameObject;
+			local child2 = child1:Find("BtnCreateRoom");
+			if (child2 ~= nil) then
+				ui.AddBtnClick(child2.gameObject, self.OnCreateClick);
+			end
+			child2 = child1:Find("BtnJoinRoom");
+			if (child2 ~= nil) then
+				ui.AddBtnClick(child2.gameObject, self.OnJoinClick);
+			end
+			child2 = child1:Find("BtnClose");
+			if (child2 ~= nil) then
+				ui.AddBtnClick(child2.gameObject, self.OnCloseFriendClick);
+			end
+		end
+		child1 = child:Find("DialogJoinRoom");
+		if (child1 ~= nil) then
+			DlgJoinRoom.gameObject = child1.gameObject;
+			DlgJoinRoom:Awake();
+			DlgJoinRoom:SetEnterCallback(self.OnEnterVenue);
+			self._dlgJoinRoom = DlgJoinRoom;
+			self._dlgJoinRoom:SetGameType(com_def.GameType.GuanDan);
+		end
+	end
+end
+
+function _module:Start()
+end
+
+function _module:Update()
+end
+
+function _module.OnFriendClick()
+	local self = _module;
+	if (self._friend ~= nil) then
+		self._friend:SetActive(true);
+	end
+end
+
+function _module.OnPraticeClick()
+	local self = _module;
+	self:CreateRoom(2);
+end
+
+function _module.OnBeginnerClick()
+	local self = _module;
+	local id = com_def.DistrictId.GuanDanBeginner;
+	local url = "/player/game/enter/district?districtId=" .. tostring(id);
+	CS.NiuMa.GameManager.Instance:AuthPost(url, nil, self.OnEnterResponse);
+end
+
+function _module.OnModerateClick()
+	local self = _module;
+	local id = com_def.DistrictId.GuanDanModerate;
+	local url = "/player/game/enter/district?districtId=" .. tostring(id);
+	CS.NiuMa.GameManager.Instance:AuthPost(url, nil, self.OnEnterResponse);
+end
+
+function _module.OnAdvancedClick()
+	local self = _module;
+	local id = com_def.DistrictId.GuanDanAdvanced;
+	local url = "/player/game/enter/district?districtId=" .. tostring(id);
+	CS.NiuMa.GameManager.Instance:AuthPost(url, nil, self.OnEnterResponse);
+end
+
+function _module.OnMasterClick()
+	local self = _module;
+	local id = com_def.DistrictId.GuanDanMaster;
+	local url = "/player/game/enter/district?districtId=" .. tostring(id);
+	CS.NiuMa.GameManager.Instance:AuthPost(url, nil, self.OnEnterResponse);
+end
+
+function _module.OnEnterResponse(code, text)
+	local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code ~= 200) then
+		--加入失败
+		local errMsg = "";
+        if (t.msg ~= nil) then
+            errMsg = t.msg;
+        else
+            errMsg = text;
+        end
+		errMsg = "加入房间失败："..errMsg;
+        gm:ShowPromptDialog(errMsg);
+	else
+		--加入成功，直接进入
+		gm:EnterVenue(t.address, t.venueId, com_def.GameType.GuanDan, self.OnEnterVenue);
+	end
+end
+
+function _module.OnCreateClick()
+	local self = _module;
+	self:CreateRoom(1);
+	if (self._friend ~= nil) then
+		self._friend:SetActive(false);
+	end
+end
+
+function _module:CreateRoom(level)
+	local msg = {};
+	msg.gameType = com_def.GameType.GuanDan;
+	local t = {};
+	t.level = level;
+	local util = CS.NiuMa.Utility;
+	local text = rapidjson.encode(t);
+	msg.base64 = util.EncodeBase64(text);
+	local body = rapidjson.encode(msg);
+	CS.NiuMa.GameManager.Instance:AuthPost("/player/game/create", body, self.OnCreateResponse);
+end
+
+function _module.OnJoinClick()
+	local self = _module;
+	if (self._dlgJoinRoom ~= nil) then
+        self._dlgJoinRoom:Show(true);
+    end
+end
+
+function _module.OnCloseFriendClick()
+	local self = _module;
+	if (self._friend ~= nil) then
+		self._friend:SetActive(false);
+	end
+end
+
+function _module.OnBackClick()
+	CS.NiuMa.GameManager.Instance:DestroyGameHall();
+end
+
+function _module.OnMoreClick()
+end
+
+function _module.OnCreateResponse(code, text)
+	local self = _module;
+    local gm = CS.NiuMa.GameManager.Instance;
+    local t = rapidjson.decode(text);
+    if (code ~= 200) then
+		--创建失败
+		local err;
+        if (t.msg ~= nil) then
+            err = t.msg;
+        else
+            err = text;
+        end
+        gm:ShowPromptDialog("创建房间失败：" .. err);
+	else
+		--创建成功，直接进入
+		gm:EnterVenue(t.address, t.venueId, com_def.GameType.GuanDan, self.OnEnterVenue);
+	end
+end
+
+function _module.OnEnterVenue()
+	local gm = CS.NiuMa.GameManager.Instance;
+	local room = gm:GetGameRoom();
+	if (room ~= nil) then
+		return;
+	end
+	local prefab = CS.NiuMa.ResourceManager.Instance:LoadResource("Prefabs/Game/GuanDan/Room", "prefabs/guandan.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (prefab ~= nil) then
+		gm:CreateHallRoom("GuanDan-Room", prefab, false);
+	end
+end
+
+return _module;

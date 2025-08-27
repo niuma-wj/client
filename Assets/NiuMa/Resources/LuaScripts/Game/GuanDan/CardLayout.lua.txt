@@ -1,0 +1,717 @@
+-- 描述：掼蛋手牌布局脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.07.24
+
+local base = require 'BehaviourBase';
+local CardSlot = require 'Game.GuanDan.CardSlot';
+local CommonUtils = require 'Common.CommonUtils';
+local pok_def = require 'Common.PokerDefines';
+local Vector3 = CS.UnityEngine.Vector3;
+local Vector2 = CS.UnityEngine.Vector2;
+local Color = CS.UnityEngine.Color;
+local DOTween = CS.NiuMa.LuaDOTween;
+
+local _module = setmetatable({}, { __index = base });
+
+--显示手牌区域的宽度
+_module.Width = 1400;
+--单张牌的最大宽度
+_module.MaxSizeX = 100;
+--单张牌的最小宽度
+_module.MinSizeX = 80;
+--正常状态下牌间纵向偏移
+_module.NormalOffsetY = 40;
+--选牌状态下牌间纵向偏移
+_module.SelectOffsetY = 60;
+
+function _module:Awake()
+	local obj = self.gameObject;
+	local child = obj.transform:Find("CardZone");
+	if (child ~= nil) then
+		self._cardZone = child;
+		self._spriteList = child.gameObject:GetComponent("SpriteList");
+	end
+	CS.NiuMa.LuaUGUI.AddBtnClick(obj, self.OnBlankClick);
+	--列映射表，key-列id，value-列GameObject
+	self._columns = {};
+	--手牌数组映射表，key-列id，value-CardSlot数组（从上到下排列）
+	self._cardSlots = {};
+	--手牌映射表，key-牌id，value-CardSlot
+	self._cardSlotMap = {};
+	--当前选中的牌id表
+	self._selectedCardIds = {};
+	--当前是否在选牌状态
+	self._isSelecting = false;
+	--当前最大已占用的列id
+	self._columnId = 0;
+end
+
+function _module:Start()
+end
+
+function _module:Update()
+	self:UpdateRelocate();
+end
+
+function _module:SetRoom(room)
+	self._room = room;
+end
+
+function _module:UpdateRelocate()
+	if (self._relocateData == nil) then
+		return;
+	end
+	if (self._relocateFrames == nil) then
+		self._relocateFrames = 0;
+	end
+	if (self._relocateFrames < 2) then
+		self._relocateFrames = self._relocateFrames + 1;
+		return;
+	end
+	--两帧之后再执行，确保调整场景树节点后重新位置场景节点可生效
+	self._relocateFrames = 0;
+	if (self._relocateData.columns) then
+		self:RelocateColumns();
+	end
+	if (self._relocateData.affectedColumnIds ~= nil) then
+		self:RelocateCardSlots(self._relocateData.affectedColumnIds, self._relocateData.flag);
+	end
+	self._relocateData = nil;
+end
+
+--清空手牌
+function _module:Clear()
+	local obj = CS.UnityEngine.GameObject;
+	for k, t in pairs(self._cardSlots) do
+		for j, s in ipairs(t) do
+			obj.Destroy(s.gameObject);
+		end
+	end
+	self._cardSlots = {};
+	self._cardSlotMap = {};
+	self._selectedCardIds = {};
+	for k, c in pairs(self._columns) do
+		obj.Destroy(c);
+	end
+	self._columns = {};
+	self._isSelecting = false;
+	self._contributeId = nil;
+	self._columnId = 0;
+end
+
+function _module:GetCardSprite(card)
+	if (card == nil) then
+		return nil;
+	end
+	if (self._spriteList == nil) then
+		return nil;
+	end
+	local index = (card.point - pok_def.PokerPoint.Ace) * 4;
+    if (card.point == pok_def.PokerPoint.Joker) then
+        index = index + (card.suit - pok_def.PokerSuit.Little);
+    else
+        index = index + (card.suit - pok_def.PokerSuit.Diamond);
+    end
+	return self._spriteList:GetSprite(index);
+end
+
+--设置贡牌或者还贡牌id
+function _module:SetContributeId(cardId)
+	self._contributeId = cardId;
+	local slot = self._cardSlotMap[cardId];
+	self:SetCardSlotColor(slot, cardId, self._selectedCardIds[cardId]);
+end
+
+--设置手牌
+--@param cards 手牌数组
+--@param gradePoint 级牌点数
+function _module:SetHandCards(cards, gradePoint, contributeId)
+	self:Clear();
+	if (cards == nil or #cards == 0) then
+		return;
+	end
+	local rm = CS.NiuMa.ResourceManager.Instance;
+	local prefabCardColumn = rm:LoadResource("Prefabs/Game/GuanDan/CardColumn", "prefabs/guandan.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (prefabCardColumn == nil) then
+		return;
+	end
+	local prefabCardSlot = rm:LoadResource("Prefabs/Game/GuanDan/CardSlot", "prefabs/guandan.ab", "Assets/NiuMa/Resources/", ".prefab");
+	if (prefabCardSlot == nil) then
+		return;
+	end
+	self._contributeId = contributeId;
+	--列数
+	local cols = 0;
+	local pointGraph = {};
+	local points = {};
+	local cardArrays = {};
+	for i, c in ipairs(cards) do
+		if (pointGraph[c.point] == nil) then
+			pointGraph[c.point] = 1;
+			cols = cols + 1;
+			table.insert(points, c.point);
+			cardArrays[c.point] = {};
+		else
+			pointGraph[c.point] = pointGraph[c.point] + 1;
+		end
+		table.insert(cardArrays[c.point], c);
+	end
+	local posX, offsetX, scale = self:CalcDimensionX(cols);
+	local posY = 0;
+	local offsetY = self:GetOffsetY();
+	local rowIdx = 0;
+	self._columnId = 0;
+	for i = cols, 1, -1 do
+		local columnObj = CS.UnityEngine.GameObject.Instantiate(prefabCardColumn, self._cardZone);
+		if (columnObj ~= nil) then
+			local trans = columnObj:GetComponent("RectTransform");
+			if (trans ~= nil) then
+				trans.anchoredPosition = Vector2(posX, 0);
+				trans.localScale = Vector3(scale, scale, 1.0);
+			end
+			posX = posX + offsetX;
+			self._columnId = self._columnId + 1;
+			self._columns[self._columnId] = columnObj;
+			columnObj.name = string.format("CardColumn%02d", self._columnId);
+			local slotArr = {};
+			local arr = cardArrays[points[i]];
+			posY = offsetY * (#arr - 1);
+			rowIdx = 0;
+			for j = 1, #arr do
+				local slotObj = CS.UnityEngine.GameObject.Instantiate(prefabCardSlot, columnObj.transform);
+				if (slotObj ~= nil) then
+					trans = slotObj:GetComponent("RectTransform");
+					if (trans ~= nil) then
+						trans.anchoredPosition = Vector2(0, posY);
+					end
+					posY = posY - offsetY;
+					rowIdx = rowIdx + 1;
+					local slot = CardSlot.NewInstance();
+					slot.gameObject = slotObj;
+					slot:Awake();
+					slot:SetLayout(self);
+					slot:SetCard(arr[j], gradePoint);
+					if (arr[j].id == self._contributeId) then
+						slot:SetColor(Color(1.0, 0.863, 0.314, 1.0));
+					end
+					slot:SetOriginalColumnId(self._columnId);
+					slot:SetCurrentColumnId(self._columnId);
+					slot:SetOriginalRow(rowIdx);
+					table.insert(slotArr, slot);
+					self._cardSlotMap[arr[j].id] = slot;
+				end
+			end
+			self._cardSlots[self._columnId] = slotArr;
+		end
+	end
+end
+
+--计算牌列的横向起始位置、间隔(相邻两列之间的横向位置偏移)、缩放
+function _module:CalcDimensionX(cols)
+	local scale = 1.0;
+	local widthMax = cols * self.MaxSizeX;
+	local widthMin = cols * self.MinSizeX;
+	local sizeX = self.MaxSizeX;
+	if (widthMax < self.Width) then
+		scale = 1.0;
+	elseif (widthMin > self.Width) then
+		sizeX = self.MinSizeX;
+		scale = 0.8;
+	else
+		sizeX = self.Width / cols;
+		scale = sizeX / self.MaxSizeX;
+	end
+	local offset = sizeX;
+	local startX = 0.0;
+	if (widthMax < self.Width) then
+		startX = (sizeX - widthMax) * 0.5;
+	else
+		if (widthMin > self.Width) then
+			offset = (self.Width - sizeX) / (cols - 1);
+		end
+		startX = (sizeX - self.Width) * 0.5; 
+	end
+	--print(tostring(startX) .. ", " .. tostring(offset) .. ", " .. tostring(scale));
+	return startX, offset, scale;
+end
+
+--计算牌的间隔(相邻两牌之间的纵向位置偏移)
+function _module:GetOffsetY()
+	local offsetY = self.NormalOffsetY;
+	if (self._isSelecting) then
+		offsetY = self.SelectOffsetY;
+	end
+	return offsetY;
+end
+
+--点击到一张牌
+function _module:OnCardClick(cardId)
+	local slot = self._cardSlotMap[cardId];
+	if (slot == nil) then
+		return;
+	end
+	if (not self._isSelecting) then
+		self._isSelecting = true;
+		self:TweenSelecting();
+	end
+	if (self._selectedCardIds[cardId]) then
+		self._selectedCardIds[cardId] = nil;
+		self:SetCardSlotColor(slot, cardId, false);
+	else
+		--判断该列中是否有其他牌已被选中，若无其他牌被选中则选中整列，否则仅选中该牌
+		local colId = slot:GetCurrentColumnId();
+		if (self:HasCardSlotSelected(colId)) then
+			self._selectedCardIds[cardId] = true;
+			self:SetCardSlotColor(slot, cardId, true);
+		else
+			--print(string.format("test123, colId: %d", colId));
+			self:SelectColumn(colId);
+		end
+	end
+end
+
+--检测指定列中是否已有牌被选中
+--@param colId 列id
+function _module:HasCardSlotSelected(colId)
+	local slotArr = self._cardSlots[colId];
+	if (slotAtr == nil) then
+		return false;
+	end
+	for i = 1, #slotArr do
+		local slot = slotArr[i];
+		local cardId = slot:GetCardId();
+		if (self._selectedCardIds[cardId]) then
+			return true;
+		end
+	end
+	return false;
+end
+
+--选中整列牌
+--@param colId 列id
+function _module:SelectColumn(colId)
+	local slotArr = self._cardSlots[colId];
+	if (slotArr == nil) then
+		return;
+	end
+	for i = 1, #slotArr do
+		local slot = slotArr[i];
+		local cardId = slot:GetCardId();
+		self._selectedCardIds[cardId] = true;
+		self:SetCardSlotColor(slot, cardId, true);
+	end
+end
+
+function _module:SetCardSlotColor(slot, cardId, isSelected)
+	if (slot == nil) then
+		return;
+	end
+	local clr = nil;
+	if (isSelected) then
+		clr = Color(0.549, 0.47, 0.784, 1.0);
+	elseif (self._contributeId == cardId) then
+		clr = Color(1.0, 0.863, 0.314, 1.0);
+	else
+		clr = Color(1.0, 1.0, 1.0, 1.0);
+	end
+	slot:SetColor(clr);
+end
+
+--点击到空白区域，取消全部选中
+function _module.OnBlankClick()
+	local self = _module;
+	if (self._room ~= nil) then
+		self._room:ResetHintCard();
+	end
+	self:UnselectAll();
+end
+
+function _module:UnselectAll()
+	for k, v in pairs(self._selectedCardIds) do
+		local slot = self._cardSlotMap[k];
+		self:SetCardSlotColor(slot, k, false);
+	end
+	self._selectedCardIds = {};
+	if (self._isSelecting) then
+		self._isSelecting = false;
+		self:TweenSelecting();
+	end
+end
+
+function _module:TweenSelecting()
+	for k, arr in pairs(self._cardSlots) do
+		self:TweenCardSlotsSelecting(arr);
+	end
+end
+
+function _module:TweenCardSlotsSelecting(arr)
+	if (arr == nil or #arr < 2) then
+		return;
+	end
+	local offsetY = self:GetOffsetY();
+	local posY = offsetY * (#arr - 1);
+	for i = 1, (#arr - 1) do
+		DOTween.DOLocalMoveY(arr[i].gameObject, posY, 0.2);
+		posY = posY - offsetY;
+	end
+end
+
+function _module:TweenCardSlots(arr)
+	if (arr == nil or #arr < 1) then
+		return;
+	end
+	local offsetY = self:GetOffsetY();
+	local posY = offsetY * (#arr - 1);
+	for i = 1, #arr do
+		--print("slot: " .. tostring(i) .. ", posY: " .. tostring(posY));
+		DOTween.DOLocalMoveY(arr[i].gameObject, posY, 0.2);
+		posY = posY - offsetY;
+	end
+end
+
+function _module:SetSelectedCardIds(cardIds)
+	local nums = 0;
+	if (cardIds ~= nil) then
+		nums = #cardIds;
+	end
+	local tmpTable = {};
+	for i = 1, nums do
+		local cardId = cardIds[i]
+		tmpTable[cardId] = true;
+		if (not self._selectedCardIds[cardId]) then
+			local slot = self._cardSlotMap[cardId];
+			self:SetCardSlotColor(slot, cardId, true);
+		end
+	end
+	for k, v in pairs(self._selectedCardIds) do
+		if (not tmpTable[k]) then
+			local slot = self._cardSlotMap[k];
+			self:SetCardSlotColor(slot, k, false);
+		end
+	end
+	self._selectedCardIds = tmpTable;
+end
+
+function _module:GetSelectedCardIds(cardIds)
+	for k, v in pairs(self._selectedCardIds) do
+		table.insert(cardIds, k);
+	end
+end
+
+--将选中的牌整理成一列
+function _module:MakeOneColumn()
+	if (self._relocateData ~= nil) then
+		return;
+	end
+	local nums = CommonUtils.CountTableElements(self._selectedCardIds);
+	if (nums == 0) then
+		return;
+	end
+	if (nums > 10) then
+		--一列最多只能有10张牌
+		CS.NiuMa.GameManager.Instance:ShowPromptTip("一列最多只能有10张牌", 2.0);
+		return;
+	end
+	local tmpTable = {};
+	for k, v in pairs(self._selectedCardIds) do
+		local colId = nil;
+		local slot = self._cardSlotMap[k];
+		if (slot ~= nil) then
+			colId = slot:GetCurrentColumnId();
+		end
+		if (colId ~= nil) then
+			if (tmpTable[colId] == nil) then
+				tmpTable[colId] = 1;
+			else
+				tmpTable[colId] = tmpTable[colId] + 1;
+			end
+		end
+	end
+	--全部牌都被选中的列的ID数组
+	local fullSelectedColumnIds = {};
+	for k, v in pairs(tmpTable) do
+		local arr = self._cardSlots[k];
+		if (arr ~= nil and #arr == v) then
+			table.insert(fullSelectedColumnIds, k);
+		end
+		if (k == 4) then
+			print(string.format("%d:%d", v, #arr));
+		end
+	end
+	local count = CommonUtils.CountTableElements(tmpTable);
+	if (count == 1 and #fullSelectedColumnIds == 1) then
+		--当前只选中了完整的一整列，没必要再另作处理
+		return;
+	end
+	local slotArr = nil;
+	local columnObj = nil;
+	local columnId = nil;
+	if (#fullSelectedColumnIds == 0) then
+		--没有被完整选中的列，创建一个新的列
+		local rm = CS.NiuMa.ResourceManager.Instance;
+		local prefabCardColumn = rm:LoadResource("Prefabs/Game/GuanDan/CardColumn", "prefabs/guandan.ab", "Assets/NiuMa/Resources/", ".prefab");
+		if (prefabCardColumn ~= nil) then
+			columnObj = CS.UnityEngine.GameObject.Instantiate(prefabCardColumn, self._cardZone);
+		end
+		if (columnObj ~= nil) then
+			self._columnId = self._columnId + 1;
+			self._columns[self._columnId] = columnObj;
+			columnObj.name = string.format("CardColumn%02d", self._columnId);
+			columnId = self._columnId;
+			slotArr = {};
+			self._cardSlots[columnId] = slotArr;
+		end
+	else
+		--将所有被选中的牌归集到第一个完整选中的列，并把该列挪到最右边
+		columnId = fullSelectedColumnIds[1];
+		columnObj = self._columns[columnId];
+		--成为兄弟姐妹节点中最后一个
+		columnObj.transform:SetAsLastSibling();
+		slotArr = self._cardSlots[columnId];
+	end
+	if (columnObj == nil) then
+		return;
+	end
+	for k, v in pairs(self._selectedCardIds) do
+		local colId = nil;
+		local slot = self._cardSlotMap[k];
+		if (slot ~= nil) then
+			colId = slot:GetCurrentColumnId();
+		end
+		local arr = nil;
+		if (colId ~= nil and colId ~= columnId) then
+			arr = self._cardSlots[colId];
+			self.RemoveCardSlotFromArray(arr, k);
+			self.InsertCardSlotToArray(slotArr, slot);
+			slot:SetCurrentColumnId(columnId);
+			slot.gameObject.transform:SetParent(columnObj.transform, false);
+		end
+	end
+	for i = #slotArr, 1, -1 do
+		local slot = slotArr[i];
+		slot.gameObject.transform:SetSiblingIndex(i - 1);
+	end
+	tmpTable[columnId] = #slotArr;
+	if (#fullSelectedColumnIds > 1) then
+		--将其他完整选中的列删除
+		for i = 2, #fullSelectedColumnIds do
+			local colId = fullSelectedColumnIds[i];
+			self._cardSlots[colId] = nil;
+			if (self._columns[colId] ~= nil) then
+				CS.UnityEngine.GameObject.Destroy(self._columns[colId]);
+				self._columns[colId] = nil;
+			end
+		end
+	end
+	--注意，这里不能直接给列和牌定位，因为本函数中调整了场景树节点，需要在一帧后才能重新设置位置，否则将不会生效
+	local relocateData = {};
+	relocateData.columns = true;
+	relocateData.affectedColumnIds = tmpTable;
+	relocateData.flag = false;
+	self._relocateData = relocateData;
+end
+
+function _module.RemoveCardSlotFromArray(arr, cardId)
+	if (cardId == nil or arr == nil) then
+		return false;
+	end
+	for i, s in ipairs(arr) do
+		if (s:GetCardId() == cardId) then
+			table.remove(arr, i);
+			return true;
+		end
+	end
+	return false;
+end
+
+function _module.InsertCardSlotToArray(arr, slot)
+	if (slot == nil or arr == nil) then
+		return false;
+	end
+	local colId1 = slot:GetOriginalColumnId();
+	local colId2 = nil;
+	local row1 = slot:GetOriginalRow();
+	local row2 = nil;
+	local test = false;
+	--arr中按牌从小到大排列，小牌在上面，大牌在下面
+	--从上到下(即从小到大)遍历
+	for i, s in ipairs(arr) do
+		colId2 = s:GetOriginalColumnId();
+		row2 = s:GetOriginalRow();
+		if (colId1 > colId2) then
+			--slot比c小，在上方
+			test = true;
+		elseif (colId1 == colId2) then
+			if (row1 < row2) then
+				--slot比c小，在上方
+				test = true;
+			end
+		end
+		if (test) then
+			table.insert(arr, i, slot);
+			return;
+		end
+	end
+	--slot比arr中所有牌都大
+	table.insert(arr, slot);
+end
+
+--重新计算所有列的横向位置
+function _module:RelocateColumns()
+	local cols = CommonUtils.CountTableElements(self._columns);
+	local posX, offsetX, scale = self:CalcDimensionX(cols);
+	for i = 1, cols do
+		local child = self._cardZone:GetChild(i - 1);
+		if (child ~= nil) then
+			--print("child: " .. tostring(i) .. ", posX: " .. tostring(posX));
+			child.anchoredPosition = Vector2(posX, 0);
+			child.localScale = Vector3(scale, scale, 1.0);
+		end
+		posX = posX + offsetX;
+	end
+end
+
+--重新计算受影响的列中所有牌的纵向位置
+--@param affectedColumnIds 受影响的列id表
+--@param flag 是否要重置兄弟节点的索引
+function _module:RelocateCardSlots(affectedColumnIds, flag)
+	for k, v in pairs(affectedColumnIds) do
+		local arr = self._cardSlots[k];
+		if (arr ~= nil) then
+			if (flag) then
+				for i = #arr, 1, -1 do
+					local slot = arr[i];
+					if (slot ~= nil) then
+						slot.gameObject.transform:SetSiblingIndex(i - 1);
+					end
+				end
+			end
+			self:TweenCardSlots(arr);
+		end
+	end
+end
+
+--撤销理牌
+function _module:ResetColumns()
+	if (self._relocateData ~= nil) then
+		return;
+	end
+	local colId1 = nil;
+	local colId2 = nil;
+	local columnObj = nil;
+	local slotArr1 = nil;
+	local slotArr2 = nil;
+	local prefabCardColumn = nil;
+	--受影响的列id表
+	local affectedColumnIds = {};
+	local rm = CS.NiuMa.ResourceManager.Instance;
+	for k, s in pairs(self._cardSlotMap) do
+		colId1 = s:GetOriginalColumnId();
+		colId2 = s:GetCurrentColumnId();
+		if (colId1 ~= colId2) then
+			columnObj = self._columns[colId1];
+			slotArr1 = self._cardSlots[colId1];
+			slotArr2 = self._cardSlots[colId2];
+			if (columnObj == nil) then
+				if (prefabCardColumn == nil) then
+					prefabCardColumn = rm:LoadResource("Prefabs/Game/GuanDan/CardColumn", "prefabs/guandan.ab", "Assets/NiuMa/Resources/", ".prefab");
+					if (prefabCardColumn == nil) then
+						return;
+					end
+				end
+				columnObj = CS.UnityEngine.GameObject.Instantiate(prefabCardColumn, self._cardZone);
+				self._columns[colId1] = columnObj;
+				columnObj.name = string.format("CardColumn%02d", colId1);
+			end
+			if (slotArr1 == nil) then
+				slotArr1 = {};
+				self._cardSlots[colId1] = slotArr1;
+			end
+			self.RemoveCardSlotFromArray(slotArr2, s:GetCardId());
+			self.InsertCardSlotToArray(slotArr1, s);
+			s:SetCurrentColumnId(colId1);
+			s.gameObject.transform:SetParent(columnObj.transform, false);
+			affectedColumnIds[colId1] = 1;
+			affectedColumnIds[colId2] = 1;
+			if (slotArr2 ~= nil and #slotArr2 == 0) then
+				--该列已无任何牌，删除该列
+				columnObj = self._columns[colId2];
+				if (columnObj ~= nil) then
+					CS.UnityEngine.GameObject.Destroy(columnObj);
+				end
+				self._columns[colId2] = nil;
+				self._cardSlots[colId2] = nil;
+				affectedColumnIds[colId2] = nil;
+			end
+		end
+	end
+	local count = CommonUtils.CountTableElements(affectedColumnIds);
+	if (count == 0) then
+		--无任何列受影响，直接返回
+		return;
+	end
+	--全部列id数组
+	local columnIds = {};
+	for k, v in pairs(self._columns) do
+		table.insert(columnIds, k);
+	end
+	table.sort(columnIds);
+	for i, v in ipairs(columnIds) do
+		columnObj = self._columns[v];
+		if (columnObj ~= nil) then
+			columnObj.transform:SetSiblingIndex(i - 1);
+		end
+	end
+	--注意，这里不能直接给列和牌定位，因为本函数中调整了场景树节点，需要在一帧后才能重新设置位置，否则将不会生效
+	local relocateData = {};
+	relocateData.columns = true;
+	relocateData.affectedColumnIds = affectedColumnIds;
+	relocateData.flag = true;
+	self._relocateData = relocateData;
+end
+
+--删除部分牌
+function _module:RemoveCards(cardIds)
+	if (cardIds == nil or #cardIds == 0) then
+		return;
+	end
+	local columnObj = nil;
+	--受影响的列id表
+	local affectedColumnIds = {};
+	local test = false;
+	for i, v in ipairs(cardIds) do
+		local colId = nil;
+		local slot = self._cardSlotMap[v];
+		if (slot ~= nil) then
+			colId = slot:GetCurrentColumnId();
+		end
+		local arr = self._cardSlots[colId];
+		if (self.RemoveCardSlotFromArray(arr, v)) then
+			if (#arr == 0) then
+				--该列已无任何牌，删除该列
+				columnObj = self._columns[colId];
+				if (columnObj ~= nil) then
+					CS.UnityEngine.GameObject.Destroy(columnObj);
+				end
+				self._columns[colId] = nil;
+				self._cardSlots[colId] = nil;
+				affectedColumnIds[colId] = nil;
+				test = true;
+			else
+				affectedColumnIds[colId] = 1;
+			end
+			CS.UnityEngine.GameObject.Destroy(slot.gameObject);
+			self._cardSlotMap[v] = nil;
+			self._selectedCardIds[v] = nil;
+		end
+	end
+	--注意，这里不能直接给列和牌定位，因为本函数中调整了场景树节点，需要在一帧后才能重新设置位置，否则将不会生效
+	local relocateData = {};
+	relocateData.columns = test;
+	relocateData.affectedColumnIds = affectedColumnIds;
+	relocateData.flag = false;
+	self._relocateData = relocateData;
+end
+
+return _module;

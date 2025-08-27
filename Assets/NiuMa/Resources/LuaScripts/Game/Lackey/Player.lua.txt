@@ -86,6 +86,7 @@ function _module:Awake()
 	if (child ~= nil) then
 		self._chatTalk = child.gameObject;
 	end
+	self._chating = false;
 	self._wins = 0;
 	self._loses = 0;
 	self._draw = 0;

@@ -23,6 +23,8 @@ _module.GameType.RedBlack = 1025;		-- 红黑大战
 _module.GameType.ZhaJinHua = 1026;		-- 炸金花
 _module.GameType.LiuAnBiJi = 1027;		-- 六安比鸡
 _module.GameType.Lackey = 1028;			-- 逮狗腿
+_module.GameType.Tractor = 1029;		-- 拖拉机
+_module.GameType.GuanDan = 1030;		-- 掼蛋
 
 _module.StageState = {};
 _module.StageState.NotStarted = 0;
@@ -101,5 +103,10 @@ _module.DistrictId.LackeyBeginner = 1;	-- 逮狗腿新手房
 _module.DistrictId.LackeyModerate = 2;	-- 逮狗腿初级房
 _module.DistrictId.LackeyAdvanced = 3;	-- 逮狗腿高级房
 _module.DistrictId.LackeyMaster = 4;	-- 逮狗腿顶级房
+
+_module.DistrictId.GuanDanBeginner = 5;	-- 掼蛋初级房
+_module.DistrictId.GuanDanModerate = 6;	-- 掼蛋中级房
+_module.DistrictId.GuanDanAdvanced = 7;	-- 掼蛋高级房
+_module.DistrictId.GuanDanMaster = 8;	-- 掼蛋顶级房
 
 return _module;

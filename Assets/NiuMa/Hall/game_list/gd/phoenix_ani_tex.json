@@ -1,0 +1,143 @@
+{
+  "width": 512,
+  "imagePath": "phoenix_ani_tex.png",
+  "height": 512,
+  "name": "phoenix_ani",
+  "SubTexture": [
+    {
+      "frameHeight": 198,
+      "y": 1,
+      "frameX": -1,
+      "width": 341,
+      "frameY": -1,
+      "height": 196,
+      "name": "hffw_bg_ani",
+      "frameWidth": 343,
+      "x": 1
+    },
+    {
+      "frameHeight": 45,
+      "y": 189,
+      "frameX": 0,
+      "width": 45,
+      "frameY": 0,
+      "height": 44,
+      "name": "hffw_tf3_ani",
+      "frameWidth": 45,
+      "x": 446
+    },
+    {
+      "width": 52,
+      "y": 278,
+      "height": 56,
+      "name": "hffw_tf2_ani",
+      "x": 1
+    },
+    {
+      "frameHeight": 30,
+      "y": 320,
+      "frameX": -1,
+      "width": 33,
+      "frameY": 0,
+      "height": 30,
+      "name": "hffw_tf1_ani",
+      "frameWidth": 34,
+      "x": 55
+    },
+    {
+      "frameHeight": 117,
+      "y": 372,
+      "frameX": 0,
+      "width": 94,
+      "frameY": 0,
+      "height": 117,
+      "name": "hffw_cbz_ani",
+      "frameWidth": 95,
+      "x": 1
+    },
+    {
+      "frameHeight": 43,
+      "y": 278,
+      "frameX": -3,
+      "width": 38,
+      "frameY": -3,
+      "height": 40,
+      "name": "hffw_xx_ani",
+      "frameWidth": 43,
+      "x": 55
+    },
+    {
+      "frameHeight": 140,
+      "y": 1,
+      "frameX": 0,
+      "width": 136,
+      "frameY": -1,
+      "height": 139,
+      "name": "hffw_cby_ani",
+      "frameWidth": 136,
+      "x": 344
+    },
+    {
+      "frameHeight": 105,
+      "y": 278,
+      "frameX": -26,
+      "width": 94,
+      "frameY": 0,
+      "height": 105,
+      "name": "hffw_wb_ani",
+      "frameWidth": 120,
+      "x": 97
+    },
+    {
+      "frameHeight": 172,
+      "y": 199,
+      "frameX": -1,
+      "width": 127,
+      "frameY": 0,
+      "height": 171,
+      "name": "hffw_shenti_ani",
+      "frameWidth": 128,
+      "x": 317
+    },
+    {
+      "frameHeight": 16,
+      "y": 336,
+      "frameX": 0,
+      "width": 16,
+      "frameY": 0,
+      "height": 15,
+      "name": "hffw_zuix_ani",
+      "frameWidth": 16,
+      "x": 31
+    },
+    {
+      "frameHeight": 18,
+      "frameWidth": 29,
+      "frameX": 0,
+      "frameY": 0,
+      "height": 18,
+      "name": "hffw_zuis_ani",
+      "width": 28,
+      "x": 1,
+      "y": 352
+    },
+    {
+      "frameHeight": 78,
+      "y": 199,
+      "frameX": 0,
+      "width": 314,
+      "frameY": -1,
+      "height": 77,
+      "name": "hffw_di_ani",
+      "frameWidth": 314,
+      "x": 1
+    },
+    {
+      "width": 161,
+      "y": 142,
+      "height": 45,
+      "name": "hffw_zi_ani",
+      "x": 344
+    }
+  ]
+}

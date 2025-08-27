@@ -2182,7 +2182,6 @@ GameObject:
   - component: {fileID: 546986281}
   - component: {fileID: 546986282}
   - component: {fileID: 546986279}
-  - component: {fileID: 546986280}
   m_Layer: 5
   m_Name: Login
   m_TagString: Untagged
@@ -2272,37 +2271,6 @@ MonoBehaviour:
   _regPasswordConfirm: {fileID: 1625344001}
   _regCode: {fileID: 327030055}
   _regImgCode: {fileID: 1382992270}
---- !u!114 &546986280
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 546986275}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a06ec628d3773470c99b541a974fbedf, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  appKey: 23cb4646d73ae
-  appSecret: 20f28f48d70dc313cb2edf1bdc42d54f
-  devInfo:
-    wechat:
-      Enable: 1
-      SortId: 5
-      AppId: wxe0ae31fe6c1f35dd
-      AppSecret: 0940c40168f30e921f55344860348e82
-      UserName: gh_afb25ac019c9@app
-      Path: /page/API/pages/share/share
-      BypassApproval: 1
-      WithShareTicket: 1
-      MiniprogramType: 0
-    wechatMoments:
-      Enable: 1
-      SortId: 6
-      AppId: wxe0ae31fe6c1f35dd
-      AppSecret: 0940c40168f30e921f55344860348e82
-      BypassApproval: 1
 --- !u!223 &546986281
 Canvas:
   m_ObjectHideFlags: 0

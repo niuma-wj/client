@@ -108,6 +108,28 @@ namespace NiuMa
             set { _promptPanel = value; }
         }
 
+        // 提示对话框和文本所在AB包名
+        private string _promptAssetBundle = "";
+        public string PromptAssetBundle
+        {
+            set { _promptAssetBundle = value; }
+            get { return _promptAssetBundle; }
+        }
+
+        private string _promptDialogPrefab = "";
+        public string PromptDialogPrefab
+        {
+            set { _promptDialogPrefab = value; }
+            get { return _promptDialogPrefab; }
+        }
+
+        private string _promptTipPrefab = "";
+        public string PromptTipPrefab
+        {
+            set { _promptTipPrefab = value; }
+            get { return _promptTipPrefab; }
+        }
+
         private GameObject _waitLogin = null;
         [BlackList]
         public GameObject WaitLogin
@@ -321,6 +343,9 @@ namespace NiuMa
         //
         private HashSet<string> _nonces = new HashSet<string>();
 
+        // 定时器列表
+        private LinkedList<TimerWrapper> _timers = new LinkedList<TimerWrapper>();
+
         public Texture2D GetTextureByUrl(String url)
         {
             if (url == null || url.Length == 0)
@@ -381,7 +406,14 @@ namespace NiuMa
                 return;
             if (strPrompt == null || strPrompt.Length == 0)
                 return;
-            GameObject prefab = Resources.Load("Prefabs/PromptDialog") as GameObject;
+            GameObject prefab = null;
+            if (!(string.IsNullOrEmpty(PromptDialogPrefab) || string.IsNullOrEmpty(PromptAssetBundle)))
+            {
+                UnityEngine.Object obj = ResourceManager.Instance.LoadResource(PromptDialogPrefab, PromptAssetBundle, "Assets/NiuMa/Resources/", ".prefab");
+                prefab = obj as GameObject;
+            }
+            if (prefab == null)
+                prefab = Resources.Load("Prefabs/PromptDialog") as GameObject;
             if (prefab == null)
                 return;
             GameObject inst = GameObject.Instantiate(prefab, _promptPanel);
@@ -408,7 +440,14 @@ namespace NiuMa
                 GameObject.Destroy(_promptTip);
                 _promptTip = null;
             }
-            GameObject prefab = Resources.Load("Prefabs/PromptTip") as GameObject;
+            GameObject prefab = null;
+            if (!(string.IsNullOrEmpty(PromptTipPrefab) || string.IsNullOrEmpty(PromptAssetBundle)))
+            {
+                UnityEngine.Object obj = ResourceManager.Instance.LoadResource(PromptTipPrefab, PromptAssetBundle, "Assets/NiuMa/Resources/", ".prefab");
+                prefab = obj as GameObject;
+            }
+            if (prefab == null)
+                prefab = Resources.Load("Prefabs/PromptTip") as GameObject;
             if (prefab == null)
                 return;
             _promptTip = GameObject.Instantiate(prefab, _tipPanel);
@@ -737,6 +776,10 @@ namespace NiuMa
             _enterVenueId = null;
             NetworkManager.Instance.Close();
             ShowConnecting(false);
+            // 退出游戏后恢复默认提示对话框和提示文本
+            PromptAssetBundle = "";
+            PromptDialogPrefab = "";
+            PromptTipPrefab = "";
             if (_gameRoom == null)
                 return;
             GameObject.Destroy(_gameRoom);
@@ -890,6 +933,7 @@ namespace NiuMa
         [BlackList]
         public void Update()
         {
+            UpdateTimer();
             if (string.IsNullOrEmpty(PlayerId))
                 return;
             TimeSpan ts = DateTime.Now - _timeLastHeartbeat;
@@ -942,6 +986,71 @@ namespace NiuMa
             data["altitude"] = Altitude;
             string body = data.ToString();
             AuthPost("/player/location", body, null);
+        }
+
+        public void AddTimer(ITimer timer, float delay, float interval = -1.0f)
+        {
+            if (timer == null)
+                return;
+            InsertTimer(new TimerWrapper(timer, delay, interval));
+        }
+
+        private void UpdateTimer()
+        {
+            if (_timers.Count == 0)
+                return;
+            float deltaTime = Time.unscaledDeltaTime;
+            LinkedListNode<TimerWrapper> node = _timers.First;
+            TimerWrapper wrapper = null;
+            List<TimerWrapper> tmpArray = new List<TimerWrapper>();
+            float delay = 0.0f;
+            while (node != null)
+            {
+                wrapper = node.Value;
+                delay = wrapper.Delay;
+                delay -= deltaTime;
+                if (delay > 0.0f)
+                {
+                    wrapper.Delay = delay;
+                    break;
+                }
+                else
+                {
+                    if (!wrapper.Trigger())
+                    {
+                        if (wrapper.Interval > 0.0f)
+                        {
+                            wrapper.Delay = delay + wrapper.Interval;
+                            tmpArray.Add(wrapper);
+                        }
+                    }
+                    _timers.RemoveFirst();
+                    node = _timers.First;
+                }
+            }
+            foreach (TimerWrapper tw in tmpArray)
+            {
+                // 将循环定时任务插回到链表中
+                InsertTimer(tw);
+            }
+        }
+
+        // 插入定时器，表头永远是最先执行的任务
+        private void InsertTimer(TimerWrapper wrapper)
+        {
+            bool test = false;
+            LinkedListNode<TimerWrapper> node;
+            for (node = _timers.First; node != null; node = node.Next)
+            {
+                if (wrapper.Delay < node.Value.Delay)
+                {
+                    test = true;
+                    _timers.AddBefore(node, wrapper);
+                    break;
+                }
+            }
+            if (!test)
+                _timers.AddLast(wrapper);
         }
     }
 }

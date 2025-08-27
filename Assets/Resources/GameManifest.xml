@@ -13,6 +13,7 @@
     <AssetBundle>images/chat.ab</AssetBundle>
     <AssetBundle>images/emojis.ab</AssetBundle>
     <AssetBundle>sounds/mahjong.ab</AssetBundle>
+    <AssetBundle>images/game.ab</AssetBundle>
     <AssetBundle>prefabs/mahjong_main.ab</AssetBundle>
     <AssetBundle>prefabs/mahjong_tiles.ab</AssetBundle>
     <AssetBundle>prefabs/mahjong_effects.ab</AssetBundle>
@@ -27,6 +28,7 @@
     <AssetBundle>images/chip.ab</AssetBundle>
     <AssetBundle>images/pokers.ab</AssetBundle>
     <AssetBundle>images/rank.ab</AssetBundle>
+    <AssetBundle>images/game.ab</AssetBundle>
     <AssetBundle>prefabs/common.ab</AssetBundle>
     <AssetBundle>prefabs/niuniu100.ab</AssetBundle>
     <AssetBundle>prefabs/niuniu100_genres.ab</AssetBundle>
@@ -43,6 +45,7 @@
     <AssetBundle>images/emojis.ab</AssetBundle>
     <AssetBundle>images/main.ab</AssetBundle>
     <AssetBundle>images/pokers.ab</AssetBundle>
+    <AssetBundle>images/game.ab</AssetBundle>
     <AssetBundle>prefabs/biji.ab</AssetBundle>
     <AssetBundle>prefabs/pokers.ab</AssetBundle>
     <AssetBundle>prefabs/emojis.ab</AssetBundle>
@@ -59,9 +62,25 @@
     <AssetBundle>lackey/setting.ab</AssetBundle>
     <AssetBundle>images/chat.ab</AssetBundle>
     <AssetBundle>images/emojis.ab</AssetBundle>
+    <AssetBundle>images/game.ab</AssetBundle>
     <AssetBundle>prefabs/lackey.ab</AssetBundle>
     <AssetBundle>prefabs/lackey_cards.ab</AssetBundle>
     <AssetBundle>prefabs/lackey_effects.ab</AssetBundle>
     <AssetBundle>sounds/lackey.ab</AssetBundle>
+  </Game>
+  <Game Name="GuanDan">
+    <AssetBundle>guandan/common.ab</AssetBundle>
+	<AssetBundle>guandan/hall.ab</AssetBundle>
+	<AssetBundle>guandan/cards.ab</AssetBundle>
+	<AssetBundle>guandan/room.ab</AssetBundle>
+	<AssetBundle>guandan/effect.ab</AssetBundle>
+	<AssetBundle>guandan/desktop.ab</AssetBundle>
+	<AssetBundle>images/chat.ab</AssetBundle>
+	<AssetBundle>images/emojis.ab</AssetBundle>
+	<AssetBundle>images/meme.ab</AssetBundle>
+    <AssetBundle>images/game.ab</AssetBundle>
+	<AssetBundle>images/pokers.ab</AssetBundle>
+	<AssetBundle>prefabs/guandan.ab</AssetBundle>
+	<AssetBundle>sounds/guandan.ab</AssetBundle>
   </Game>
 </GameManifest>

@@ -1,0 +1,177 @@
+-- 描述：掼蛋聊天对话框界面脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.07.23
+
+local base = require 'BehaviourBase';
+local rapidjson = require('rapidjson');
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("Frame/ToggleGroup");
+    local child1 = nil;
+	local ui = CS.NiuMa.LuaUGUI;
+    if (child ~= nil) then
+		child1 = child:Find("ToggleMeme");
+        if (child1 ~= nil) then
+            ui.AddToggleClick(child1.gameObject, self.OnMemeCheck);
+        end
+        child1 = child:Find("TogglePhrase");
+        if (child1 ~= nil) then
+            ui.AddToggleClick(child1.gameObject, self.OnPhraseCheck);
+        end
+        child1 = child:Find("ToggleEmoji");
+        if (child1 ~= nil) then
+            ui.AddToggleClick(child1.gameObject, self.OnEmojiCheck);
+        end
+    end
+	child = obj.transform:Find("Frame/MemeList");
+	if (child ~= nil) then
+        self._memeList = child.gameObject;
+    end
+    child = obj.transform:Find("Frame/PhraseList");
+	if (child ~= nil) then
+        self._phraseList = child.gameObject;
+    end
+    child = obj.transform:Find("Frame/EmojiList");
+	if (child ~= nil) then
+        self._emojiList = child.gameObject;
+    end
+	child = obj.transform:Find("Frame/MemeList/Viewport/Content");
+	if (child ~= nil) then
+		for i = 1, 13 do
+			local child1 = child:Find(string.format("Meme%02d", i));
+			if (child1 ~= nil) then
+				ui.AddBtnAction(child1.gameObject, self.OnMemeClick, i);
+			end
+		end
+	end
+    child = obj.transform:Find("Frame/PhraseList/Viewport/Content");
+	if (child ~= nil) then
+		for i = 1, 9 do
+			local child1 = child:Find(string.format("Phrase%02d", i));
+			if (child1 ~= nil) then
+				ui.AddBtnAction(child1.gameObject, self.OnPhraseClick, i);
+			end
+		end
+	end
+	child = obj.transform:Find("Frame/EmojiList/Viewport/Content");
+	if (child ~= nil) then
+		for i = 1, 27 do
+			local child1 = child:Find(string.format("Emoji%02d", i));
+			if (child1 ~= nil) then
+				ui.AddBtnAction(child1.gameObject, self.OnEmojiClick, i);
+			end
+		end
+	end
+	child = obj.transform:Find("Frame/BtnClose");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnCloseClick);
+	end
+	child = obj.transform:Find("Frame/InputField");
+	if (child ~= nil) then
+		self._inputField = child.gameObject;
+	end
+	child = obj.transform:Find("Frame/BtnSend");
+	if (child ~= nil) then
+		ui.AddBtnClick(child.gameObject, self.OnSendClick);
+	end
+    self._chatPage = 1;
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module.OnMemeClick(idx)
+	local self = _module;
+	self:SendChatMessage(4, idx, "");
+	self:Show(false);
+end
+
+function _module.OnEmojiClick(idx)
+	local self = _module;
+	self:SendChatMessage(1, idx, "");
+	self:Show(false);
+end
+
+function _module.OnPhraseClick(idx)
+	local self = _module;
+	self:SendChatMessage(2, idx, "");
+	self:Show(false);
+end
+
+function _module:SendChatMessage(type_, idx, text)
+	local gm = CS.NiuMa.GameManager.Instance;
+    local nm = CS.NiuMa.NetworkManager.Instance;
+	local msg = {};
+	msg.venueId = gm.VenueId;
+	msg.type = type_;
+	msg.index = idx;
+	msg.text = text;
+	local json = rapidjson.encode(msg);
+	nm:SendMessage("MsgChatClient", json, true);
+end
+
+function _module.OnCloseClick()
+	local self = _module;
+	self:Show(false);
+end
+
+function _module.OnSendClick()
+	local self = _module;
+	if (self._inputField == nil) then
+		return;
+	end
+	local ui = CS.NiuMa.LuaUGUI;
+	local text = ui.GetInputText(self._inputField);
+    if (text == nil or #text == 0) then
+		return;
+	end
+	ui.SetInputText(self._inputField, "");
+	self:SendChatMessage(3, 0, text);
+	self:Show(false);
+end
+
+function _module.OnMemeCheck(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._chatPage = 1;
+    self:OnChatPageChanged();
+end
+
+function _module.OnPhraseCheck(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._chatPage = 2;
+    self:OnChatPageChanged();
+end
+
+function _module.OnEmojiCheck(val)
+	if (not val) then
+		return;
+	end
+	local self = _module;
+	self._chatPage = 3;
+    self:OnChatPageChanged();
+end
+
+function _module:OnChatPageChanged()
+	if (self._memeList ~= nil) then
+        self._memeList:SetActive(self._chatPage == 1);
+    end
+    if (self._phraseList ~= nil) then
+        self._phraseList:SetActive(self._chatPage == 2);
+    end
+    if (self._emojiList ~= nil) then
+        self._emojiList:SetActive(self._chatPage == 3);
+    end
+end
+
+return _module;

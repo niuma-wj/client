@@ -1,0 +1,244 @@
+-- 描述：掼蛋牌局结果对话框脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.08.09
+
+local base = require 'BehaviourBase';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+    local obj = self.gameObject;
+    local child1 = obj.transform:Find("Frame");
+    if (child1 == nil) then
+        return;
+    end
+    local child2 = child1:Find("TitleWin");
+    if (child2 ~= nil) then
+        self._titleWin = child2.gameObject;
+    end
+    child2 = child1:Find("TitleLose");
+    if (child2 ~= nil) then
+        self._titleLose = child2.gameObject;
+    end
+    local child3 = nil;
+    local child4 = nil;
+    self._players = {};
+    local ui = CS.NiuMa.LuaUGUI;
+    child2 = child1:Find("PlayerGroup");
+    if (child2 ~= nil) then
+        for i = 1, 4 do
+            child3 = child2:Find(string.format("Player%d", i));
+            if (child3 ~= nil) then
+                local player = {};
+                child4 = child3:Find("HeadTexture");
+                if (child4 ~= nil) then
+                    player.headTexture = child4.gameObject;
+                end
+                child4 = child3:Find("Nickname");
+                if (child4 ~= nil) then
+                    player.nickname = child4.gameObject;
+                end
+                child4 = child3:Find("TextGold");
+                if (child4 ~= nil) then
+                    player.textGold = child4.gameObject;
+                end
+                child4 = child3:Find("FlagWin");
+                if (child4 ~= nil) then
+                    player.flagWin = child4.gameObject;
+                end
+                child4 = child3:Find("FlagLose");
+                if (child4 ~= nil) then
+                    player.flagLose = child4.gameObject;
+                end
+                child4 = child3:Find("FlagFriend");
+                if (child4 ~= nil) then
+                    player.flagFriend = child4.gameObject;
+                end
+                child4 = child3:Find("FlagEnemy");
+                if (child4 ~= nil) then
+                    player.flagEnemy = child4.gameObject;
+                end
+                child4 = child3:Find("BtnKickOut");
+                if (child4 ~= nil) then
+                    player.btnKickOut = child4.gameObject;
+                    ui.AddBtnAction(child4.gameObject, self.OnKickOutClick, i);
+                end
+                child4 = child3:Find("FlagKickOut");
+                if (child4 ~= nil) then
+                    player.flagKickOut = child4.gameObject;
+                end
+                self._players[i] = player;
+            end
+        end
+    end
+    child2 = child1:Find("GradePointNext");
+    if (child2 ~= nil) then
+        child3 = child2:Find("Text");
+        if (child3 ~= nil) then
+            self._gradePointText = child3.gameObject;
+        end
+    end
+    child2 = child1:Find("ButtonGroup");
+    if (child2 ~= nil) then
+        child3 = child2:Find("BtnExit");
+        if (child3 ~= nil) then
+            ui.AddBtnClick(child3.gameObject, self.OnExitClick);
+        end
+        child3 = child2:Find("BtnNextRound");
+        if (child3 ~= nil) then
+            self._btnNextGroup = child3.gameObject;
+            ui.AddBtnClick(child3.gameObject, self.OnNextClick);
+            child3 = child3:Find("Second");
+            if (child3 ~= nil) then
+                self._second = child3.gameObject;
+            end
+        end
+    end
+    self._isOwner = false;
+    self._countDown = 0.0;
+end
+
+function _module:Update()
+    if (self._second == nil) then
+        return;
+    end
+    if (self._countDown < 1.0) then
+        return;
+    end
+    self._countDown = self._countDown - CS.UnityEngine.Time.unscaledDeltaTime;
+    local text = nil;
+    if (self._countDown < 0.0) then
+        text = "0";
+    else
+        text = tostring(math.floor(self._countDown));
+    end
+    CS.NiuMa.LuaUGUI.SetText(self._second, text);
+    if (self._countDown < 1.0) then
+        self.OnNextClick();
+    end
+end
+
+function _module:SetRoom(room)
+    self._room = room;
+end
+
+function _module:Show(s)
+    self.gameObject:SetActive(s);
+end
+
+function _module:SetOwner(flag)
+    self._isOwner = flag;
+end
+
+function _module:SetPlayer(idx, playerData, isSelf)
+    if (isSelf) then
+        if (self._btnNextGroup ~= nil) then
+            self._btnNextGroup:SetActive(not playerData.isKicked);
+        end
+    end
+    local player = self._players[idx];
+    if (player == nil) then
+        return;
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    if (player.headTexture ~= nil) then
+        ui.SetTexture(player.headTexture, playerData.headTexture);
+    end
+    if (player.nickname ~= nil) then
+        ui.SetText(player.nickname, playerData.nickname);
+    end
+    if (player.textGold ~= nil) then
+        ui.SetText(player.textGold, tostring(playerData.gold));
+    end
+    if (player.flagWin ~= nil) then
+        player.flagWin:SetActive(playerData.isWin);
+    end
+    if (player.flagLose ~= nil) then
+        player.flagLose:SetActive(not playerData.isWin);
+    end
+    if (player.flagFriend ~= nil) then
+        player.flagFriend:SetActive(playerData.isFriend);
+    end
+    if (player.flagEnemy ~= nil) then
+        player.flagEnemy:SetActive(not playerData.isFriend);
+    end
+    if (player.btnKickOut ~= nil) then
+        if ((not self._isOwner) or isSelf) then
+            player.btnKickOut:SetActive(false);
+        else
+            player.btnKickOut:SetActive(not playerData.isKicked);
+        end
+    end
+    if (player.flagKickOut ~= nil) then
+        player.flagKickOut:SetActive(playerData.isKicked);
+    end
+    if (isSelf) then
+        if (self._titleWin ~= nil) then
+            self._titleWin:SetActive(playerData.isWin);
+        end
+        if (self._titleLose ~= nil) then
+            self._titleLose:SetActive(not playerData.isWin);
+        end
+    end
+end
+
+function _module:SetPlayerKickOut(idx, isSelf)
+    if (isSelf) then
+        if (self._btnNextGroup ~= nil) then
+            self._btnNextGroup:SetActive(false);
+        end
+    end
+    local player = self._players[idx];
+    if (player == nil) then
+        return;
+    end
+    local ui = CS.NiuMa.LuaUGUI;
+    if (player.btnKickOut ~= nil) then
+        player.btnKickOut:SetActive(false);
+    end
+    if (player.flagKickOut ~= nil) then
+        player.flagKickOut:SetActive(true);
+    end
+end
+
+function _module:SetGradePoint(text)
+    if (self._gradePointText ~= nil) then
+        CS.NiuMa.LuaUGUI.SetText(self._gradePointText, text);
+    end
+end
+
+function _module:StartCountDown()
+    self._countDown = 10.99;
+end
+
+function _module.OnKickOutClick(idx)
+    
+end
+
+function _module.OnExitClick()
+    --请求退出房间
+    local nm = CS.NiuMa.NetworkManager.Instance;
+    if (nm:IsConnected()) then
+	    nm:SendInnerMessage("MsgLeaveVenue");
+    else
+        local gm = CS.NiuMa.GameManager.Instance;
+        gm:DestroyGameRoom();
+	    gm:GetCapital();
+    end
+end
+
+function _module.OnNextClick()
+    local self = _module;
+    self:Show(false);
+    if (self._room ~= nil) then
+        self._room._showResult = false;
+    end
+	local nm = CS.NiuMa.NetworkManager.Instance;
+    --请求同步掼蛋游戏数据
+	nm:SendInnerMessage("MsgGuanDanSync");
+    --准备就绪
+    nm:SendInnerMessage("MsgPlayerReady");
+end
+
+return _module;

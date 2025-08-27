@@ -487,17 +487,6 @@ function _module:OnReconnect()
 end
 
 function _module:SetGeolocation()
-    --[[
-	local lat = GameManager.Instance.Latitude;
-	local lon = GameManager.Instance.Longitude;
-	local alt = GameManager.Instance.Altitude;
-	local msg = bd_pb.NetMsgFloatArray();
-	msg.Values:append(lat);
-	msg.Values:append(lon);
-	msg.Values:append(alt);
-	local pb_data = msg:SerializeToString();
-	LuaGameUtilities.SendTableMessage("PT_PLAYER_GEOLOCATION", "NetMsgFloatArray", pb_data);
-    --]]
 end
 
 function _module:HideButtons()
@@ -587,7 +576,7 @@ function _module:OnSyncTable(json)
         elseif (msg.level == self.TableLevel.Advanced) then
             text = "高级房";
         elseif (msg.level == self.TableLevel.Master) then
-            text = "顶级房";
+            text = "大师房";
         end
         ui.SetText(self._textLevel, text);
     end
@@ -1155,18 +1144,15 @@ function _module.OnChuPaiClick()
     local ids = {};
     self._handCards:AllSelectedCards(ids);
     local nums = #ids;
+    local gm = CS.NiuMa.GameManager.Instance;
     if (nums == 0) then
-        CS.NiuMa.GameManager.Instance:ShowPromptTip("未选中任何牌", 2.0);
+        gm:ShowPromptTip("未选中任何牌", 2.0);
         return;
     end
-    local gm = CS.NiuMa.GameManager.Instance;
     local msg = {};
     msg.venueId = gm.VenueId;
     msg.pass = false;
-    msg.cardIds = {};
-    for i = 1, nums do
-        table.insert(msg.cardIds, ids[i]);
-    end
+    msg.cardIds = ids;
     local json = rapidjson.encode(msg);
 	CS.NiuMa.NetworkManager.Instance:SendMessage("MsgLackeyDoPlayCard", json, true);
 end
@@ -1439,9 +1425,14 @@ function _module:OnLeaveVenueResp(json)
 		    self.ExitRoom();
         end
 	elseif (not self._switchRoom) then
-		--离开失败，请求解散
-        local nm = CS.NiuMa.NetworkManager.Instance;
-		nm:SendInnerMessage("MsgDisbandRequest");
+        if (msg.result == 1) then
+		    --正在游戏中，请求解散
+            local nm = CS.NiuMa.NetworkManager.Instance;
+		    nm:SendInnerMessage("MsgDisbandRequest");
+        else
+            --其他错误且无法解散，提示
+            CS.NiuMa.GameManager.Instance:ShowPromptTip(msg.errMsg, 2.0);
+        end
 	end
     self._switchRoom = false;
 end

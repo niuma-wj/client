@@ -1,0 +1,102 @@
+-- 描述：掼蛋手牌单张脚本
+-- 作者：wujian
+-- 邮箱：393817707@qq.com
+-- 日期：2025.07.24
+
+local base = require 'BehaviourBase';
+local Poker = require 'Common.Poker';
+local pok_def = require 'Common.PokerDefines';
+
+local _module = setmetatable({}, { __index = base });
+
+function _module:Awake()
+	local obj = self.gameObject;
+    local child = obj.transform:Find("frp");
+    if (child ~= nil) then
+        self._frp = child.gameObject;
+    end
+    CS.NiuMa.LuaUGUI.AddBtnClick(obj, self:OnCardClick());
+    self._isFrp = false;
+end
+
+function _module:SetLayout(layout)
+    self._layout = layout;
+end
+
+function _module:SetCard(card, gradePoint)
+    self._id = card.id;
+    local ui = CS.NiuMa.LuaUGUI;
+    local sprite = self._layout:GetCardSprite(card);
+    ui.SetImage(self.gameObject, sprite, false);
+    if (card.point == gradePoint and card.suit == pok_def.PokerSuit.Heart) then
+        self:SetFrp();
+    end
+end
+
+function _module:GetCardId()
+    return self._id;
+end
+
+--设置原始列ID
+--从左到右从1开始
+function _module:SetOriginalColumnId(colId)
+    self._originalColumnId = colId;
+end
+
+--获取原始列ID
+function _module:GetOriginalColumnId()
+    return self._originalColumnId;
+end
+
+--设置原始行序号
+--从上到下从1开始
+function _module:SetOriginalRow(row)
+    self._originalRow = row;
+end
+
+--获取原始行序号
+function _module:GetOriginalRow()
+    return self._originalRow;
+end
+
+--设置当前列ID
+function _module:SetCurrentColumnId(colId)
+    self._currentColumnId = colId;
+end
+
+--获取当前列ID
+function _module:GetCurrentColumnId()
+    return self._currentColumnId;
+end
+
+function _module:SetColor(clr)
+    local ui = CS.NiuMa.LuaUGUI;
+    ui.SetImageColor(self.gameObject, clr);
+    if (self._isFrp and self._frp ~= nil) then
+        ui.SetImageColor(self._frp, clr);
+    end
+end
+
+function _module:SetFrp()
+    self._isFrp = true;
+    if (self._frp ~= nil) then
+        self._frp:SetActive(true);
+    end
+end
+
+function _module:OnCardClick()
+    local inst = self;
+    return function()
+		local self = inst;
+		if (self._layout ~= nil) then
+            self._layout:OnCardClick(self._id);
+        end
+	end
+end
+
+function _module.NewInstance()
+    local t = setmetatable({}, { __index = _module });
+    return t;
+end
+
+return _module;

@@ -88,7 +88,8 @@ public class Load : MonoBehaviour
     /// </summary>
     private void LoadConfig()
     {
-        const string url = "http://192.168.1.2:8080/config.json";
+        const string url = "https://gzyx.oss-cn-shenzhen.aliyuncs.com/config.json";
+        //const string url = "http://192.168.6.220:8088/niuma/config.json";
         HttpRequester.Instance.Get(url, null, OnLoadConfig);
     }
 
