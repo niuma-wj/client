@@ -1,12 +1,12 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using MessagePack;
 
 namespace NiuMa
 {
     /// <summary>
-    /// ½øÈëÏìÓ¦ÏûÏ¢
-    /// ·şÎñÆ÷->¿Í»§¶Ë
+    /// å“åº”è¿›å…¥åœºåœ°æ¶ˆæ¯
+    /// æœåŠ¡å™¨->å®¢æˆ·ç«¯
     /// </summary>
     [MessagePackObject(keyAsPropertyName: true)]
     public class MsgEnterVenueResp : MsgBase
@@ -19,18 +19,18 @@ namespace NiuMa
         }
 
         /// <summary>
-        /// ³¡µØid
+        /// åœºåœ°id
         /// </summary>
         public string venueId { get; set; }
 
         /// <summary>
-        /// ½á¹û´úÂë(0-³É¹¦£¬1-Î´ÊÚÈ¨£¬2-ÓÎÏ·ÀàĞÍ´íÎó£¬3-³¡µØ¼ÓÔØÊ§°Ü£¬4-³¡µØ×´Ì¬´íÎó£¬
-        /// 5-½øÈëÊ§°Ü(ÀıÈçÒÑÂúÈË)£¬6-ÆäËû´íÎó)
+        /// ç»“æœä»£ç (0-æˆåŠŸï¼Œ1-æœªæˆæƒï¼Œ2-æ¸¸æˆç±»å‹é”™è¯¯ï¼Œ3-åœºåœ°åŠ è½½å¤±è´¥ï¼Œ4-åœºåœ°çŠ¶æ€é”™è¯¯ï¼Œ
+        /// 5-è¿›å…¥å¤±è´¥(ä¾‹å¦‚å·²æ»¡äºº)ï¼Œ6-å…¶ä»–é”™è¯¯)
         /// </summary>
         public int code { get; set; }
 
         /// <summary>
-        /// ´íÎóÏûÏ¢
+        /// é”™è¯¯æ¶ˆæ¯
         /// </summary>
         public string errMsg { get; set; }
     }

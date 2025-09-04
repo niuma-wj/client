@@ -65,6 +65,9 @@ namespace NiuMa
         // 断线后尝试重连次数
         private int _reconnects = 0;
 
+        // 断线重连标志，false-首次连接，true-断线重连
+        private bool _reconnectFlag = false;
+
         // 是否已经做网络连接失败提示
         private bool _prompted = false;
 
@@ -378,6 +381,8 @@ namespace NiuMa
                 OnConnect(msg);
             else if (msgType.Equals(MsgDisconnect.TYPE))
                 OnDisconnect(msg);
+            else if (msgType.Equals(MsgPlayerConnectResp.TYPE))
+                OnPlayerConnectResp();
             else if (msgType.Equals(MsgEnterVenueResp.TYPE))
                 OnEnterVenue(msg);
             else if (msgType.Equals(MsgHeartbeatResp.TYPE))
@@ -403,6 +408,7 @@ namespace NiuMa
             if (inst.succeed != 0)
             {
                 // 连接成功
+                _receivedHeartbeat = true;
                 _reconnects = 0;
                 _prompted = false;
                 GameManager.Instance.ShowConnecting(false);
@@ -414,6 +420,7 @@ namespace NiuMa
                 if (!string.IsNullOrEmpty(_venueId) && _gameType != 0)
                 {
                     // 进入场地
+                    _reconnectFlag = false;
                     Debug.LogFormat("Enter venue(Id: {0})", _venueId);
                     MsgEnterVenue enter = new MsgEnterVenue();
                     enter.venueId = _venueId;
@@ -421,10 +428,10 @@ namespace NiuMa
                     GameManager.Instance.SignatureMessage(enter);
                     SendMessage(enter);
                 }
-                else if (!string.IsNullOrEmpty(GameManager.Instance.VenueId))
+                else
                 {
-                    foreach (IReconnectHandler handler in _reconnectHandlers)
-                        handler.OnReconnect();
+                    // 之前已经进入场地，现在断线重连
+                    _reconnectFlag = true;
                 }
             }
             else
@@ -473,6 +480,16 @@ namespace NiuMa
                 EnterVenue(_waitEnterData.ip, _waitEnterData.port, _waitEnterData.venueId, _waitEnterData.gameType);
                 _waitEnterData = null;
             }
+        }
+
+        private void OnPlayerConnectResp()
+        {
+            if (!_reconnectFlag)
+                return;
+            if (string.IsNullOrEmpty(GameManager.Instance.VenueId))
+                return;
+            foreach (IReconnectHandler handler in _reconnectHandlers)
+                handler.OnReconnect();
         }
 
         private void OnEnterVenue(MsgBase msg)

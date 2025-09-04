@@ -11,6 +11,7 @@ namespace NiuMa
         {
             RegisterMsgFactory(new MsgFactory<MsgConnect>("MsgConnect"));
             RegisterMsgFactory(new MsgFactory<MsgDisconnect>("MsgDisconnect"));
+            RegisterMsgFactory(new MsgFactory<MsgPlayerConnectResp>("MsgPlayerConnectResp"));
             RegisterMsgFactory(new MsgFactory<MsgEnterVenueResp>("MsgEnterVenueResp"));
             RegisterMsgFactory(new MsgFactory<MsgHeartbeatResp>("MsgHeartbeatResp"));
             RegisterMsgFactory(new MsgFactory<MsgPlayerSignatureError>("MsgPlayerSignatureError"));
