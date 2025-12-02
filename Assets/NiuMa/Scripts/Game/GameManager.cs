@@ -337,7 +337,7 @@ namespace NiuMa
         // 当前已加载的游戏
         private List<string> _gameLoaded = new List<string>();
 
-        // 一分钟的生成的Nonce序列
+        // 一分钟内生成的Nonce序列
         private List<KeyValuePair<long, string> > _nonceSequence = new List<KeyValuePair<long, string> >();
 
         //

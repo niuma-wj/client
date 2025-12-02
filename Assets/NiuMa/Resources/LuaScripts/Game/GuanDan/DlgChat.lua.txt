@@ -87,19 +87,19 @@ end
 
 function _module.OnMemeClick(idx)
 	local self = _module;
-	self:SendChatMessage(4, idx, "");
+	self:SendChatMessage(4, idx - 1, "");
 	self:Show(false);
 end
 
 function _module.OnEmojiClick(idx)
 	local self = _module;
-	self:SendChatMessage(1, idx, "");
+	self:SendChatMessage(1, idx - 1, "");
 	self:Show(false);
 end
 
 function _module.OnPhraseClick(idx)
 	local self = _module;
-	self:SendChatMessage(2, idx, "");
+	self:SendChatMessage(2, idx - 1, "");
 	self:Show(false);
 end
 

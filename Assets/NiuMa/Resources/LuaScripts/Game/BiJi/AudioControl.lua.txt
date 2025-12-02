@@ -168,7 +168,7 @@ function _module:PlayPhrase(clientSeat, phrase, male)
     else
         clipName = string.format("Sounds/Game/BiJi/Phrase/Female/phrase%02d", phrase);
     end
-    local clip = self:GetAudioClip(clipName);
+    local clip = self:GetAudioClip(clipName, "ogg");
     if (clip ~= nil) then
         self._players[clientSeat].clip = clip;
         self._players[clientSeat]:Play();

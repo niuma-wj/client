@@ -367,7 +367,7 @@ namespace NiuMa
         }
 
         /// <summary>
-        /// 本地时间转换到Unix时间戳
+        /// 本地时间转换到Unix时间戳，单位秒
         /// </summary>
         /// <param name="dateTime">本地时间，例如DateTime.Now</param>
         /// <returns>Unix时间戳</returns>

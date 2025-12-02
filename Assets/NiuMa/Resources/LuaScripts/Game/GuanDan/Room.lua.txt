@@ -969,9 +969,9 @@ function _module:ResetPlayers()
 				if (self._playerInfos[i] ~= nil) then
 					local isSelf = ((i - 1) == self._seat);
 					local isOwner = ((i - 1) == self._ownerSeat);
-					self._seatPanels[idx]:SetPlayerInfo(self._playerInfos[i], isSelf, isOwner);
+					self._seatPanels[i]:SetPlayerInfo(self._playerInfos[i], isSelf, isOwner);
 				else
-					self._seatPanels[idx]:SetEmpty();
+					self._seatPanels[i]:SetEmpty();
 				end
 			end
 		end
@@ -1208,7 +1208,7 @@ function _module:OnChatServer(json)
 			elseif (msg.type == 3) then
 				self._seatPanels[clientSeat]:SetChatText(msg.text);
 			elseif (msg.type == 4) then
-				self._seatPanels[clientSeat]:SetChatMeme(self._memes[msg.index]);
+				self._seatPanels[clientSeat]:SetChatMeme(self._memes[msg.index + 1]);
 			end
 		end
 	elseif (self._players[clientSeat] ~= nil) then
@@ -1223,7 +1223,7 @@ function _module:OnChatServer(json)
 		elseif (msg.type == 3) then
 			self._players[clientSeat]:SetChatText(msg.text);
 		elseif (msg.type == 4) then
-			self._players[clientSeat]:SetChatMeme(self._memes[msg.index]);
+			self._players[clientSeat]:SetChatMeme(self._memes[msg.index + 1]);
 		end
 	end
 end
@@ -1818,6 +1818,9 @@ function _module:OnCardAlert(json)
 		return;
 	end
 	local msg = rapidjson.decode(json);
+	if (self._audioCtrl ~= nil) then
+        self._audioCtrl:PlayAlert();
+    end
 end
 
 function _module:OnClearPlayedOut(json)

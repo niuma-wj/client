@@ -282,19 +282,20 @@ function _module:PlayPhrase(male, clientSeat, phrase)
     if (CS.NiuMa.AudioManager.Instance.MuteSound) then
         return;
     end
-    if (phrase < 1 or phrase > 13) then
+    if (phrase < 0 or phrase > 8) then
         return;
     end
     if (self._phrases[clientSeat] == nil) then
         return;
     end
+    phrase = phrase + 1;
     local clipName = "";
     if (male) then
         clipName = string.format("Sounds/Game/GuanDan/Phrase/Male/phrase%02d", phrase);
     else
         clipName = string.format("Sounds/Game/GuanDan/Phrase/Female/phrase%02d", phrase);
     end
-    local clip = self:GetAudioClip(clipName);
+    local clip = self:GetAudioClip(clipName, "ogg");
     if (clip ~= nil) then
         self._phrases[clientSeat].clip = clip;
         self._phrases[clientSeat]:Play();
@@ -305,9 +306,10 @@ function _module:PlayProp(clientSeat, prop)
     if (CS.NiuMa.AudioManager.Instance.MuteSound) then
         return;
     end
-    if (prop < 1 or prop > 5) then
+    if (prop < 0 or prop > 4) then
         return;
     end
+    prop = prop + 1;
     local clipName = string.format("Sounds/Game/GuanDan/Prop/pro_%d", prop);
     local clip = self:GetAudioClip(clipName);
     if (clip ~= nil) then

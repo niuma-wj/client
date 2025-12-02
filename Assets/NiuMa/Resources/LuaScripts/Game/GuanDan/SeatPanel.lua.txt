@@ -285,9 +285,11 @@ function _module:SetChatMeme(image)
 end
 
 function _module:SetChatEmoji(idx)
-	if (idx < 1 or idx > 27) then
+	if (idx < 0 or idx > 26) then
 		return;
 	end
+	-- Lua数组索引从1开始
+	idx = idx + 1;
 	if (self._chatMeme ~= nil) then
         self._chatMeme:SetActive(false);
 	end
@@ -340,9 +342,11 @@ _module.Phrases =
 };
 
 function _module:SetChatPhrase(idx)
-    if (idx < 1 or idx > 9) then
+    if (idx < 0 or idx > 8) then
         return;
 	end
+	-- Lua数组索引从1开始
+	idx = idx + 1;
     self:SetChatText(self.Phrases[idx]);
 end
 
