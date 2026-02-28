@@ -42,7 +42,7 @@ The output effect after debug-mode is enabled.\
 # Testing client
 
 A testing client is available on the Internet, every one is welcomed to download and test it.\
-[client](http://106.13.15.226:8896/download)
+[client](http://106.55.181.89:8896/download)
 
 # Note
 
